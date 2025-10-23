@@ -1,0 +1,35 @@
+{
+  "name": "Little Jungle POS",
+  "short_name": "Jungle POS",
+  "description": "Point of Sale System for Little Jungle Playground",
+  "start_url": "./Grok1.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#22c55e",
+  "id": "/little-jungle-pos",
+  "icons": [
+    {
+      "src": "icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshot1.png",
+      "sizes": "540x720",
+      "type": "image/png"
+    },
+    {
+      "src": "screenshot2.png",
+      "sizes": "720x540",
+      "type": "image/png"
+    }
+  ],
+  "scope": "/"
+}

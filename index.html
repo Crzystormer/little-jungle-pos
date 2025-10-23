@@ -1,0 +1,1650 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Little Jungle Playground POS</title>
+    <link rel="manifest" href="./manifest.json">	
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, -apple-system, sans-serif;
+            overflow-x: hidden;
+        }
+        
+        html, body, #root {
+            height: 100%;
+            width: 100%;
+        }
+
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+        
+        // Firebase Configuration - REPLACE WITH YOUR OWN CONFIG
+        const firebaseConfig = {
+            	apiKey: "AIzaSyCI4Fsf6vUwnYAGvraeBVxurhUvjgaJy9s",
+ 		authDomain: "little-jungle-pos.firebaseapp.com",
+  		projectId: "little-jungle-pos",
+  		storageBucket: "little-jungle-pos.firebasestorage.app",
+  		messagingSenderId: "298080389561",
+  		appId: "1:298080389561:web:fe1e9d8ddd03f41c8f4e68",
+  		measurementId: "G-RFBM6YH2RG"
+        };
+        
+        let db = null;
+        let firebaseEnabled = false;
+        
+        // Initialize Firebase if config is provided
+        try {
+            if (firebaseConfig.apiKey !== "YOUR_API_KEY") {
+                firebase.initializeApp(firebaseConfig);
+                db = firebase.firestore();
+                firebaseEnabled = true;
+                console.log("Firebase initialized successfully");
+            }
+        } catch (error) {
+            console.log("Firebase not configured, using localStorage only");
+        }
+        
+        const LittleJunglePOS = () => {
+            const [activeTab, setActiveTab] = useState('tables');
+            const [cart, setCart] = useState([]);
+            const [selectedTable, setSelectedTable] = useState(null);
+            const [selectedWaiter, setSelectedWaiter] = useState(null);
+            const [showWaiterSelect, setShowWaiterSelect] = useState(false);
+            const [showPaymentModal, setShowPaymentModal] = useState(false);
+            const [showOrderModal, setShowOrderModal] = useState(false);
+            const [selectedCategory, setSelectedCategory] = useState('All');
+            const [amountReceived, setAmountReceived] = useState('');
+            const [tipAmount, setTipAmount] = useState('0');
+            const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
+            const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
+            const [tableDescription, setTableDescription] = useState('');
+            const [showDescriptionModal, setShowDescriptionModal] = useState(false);
+            const [pendingTable, setPendingTable] = useState(null);
+            const [bluetoothDevice, setBluetoothDevice] = useState(null);
+            const [showSettings, setShowSettings] = useState(false);
+            const [showAddItem, setShowAddItem] = useState(false);
+            const [newItem, setNewItem] = useState({ name: '', category: 'Drinks', price: '', stock: '' });
+            const [isFullScreen, setIsFullScreen] = useState(false);
+            const fileInputRef = useRef(null);
+
+            const toggleFullScreen = () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(err => {
+                        console.error(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+                    });
+                    setIsFullScreen(true);
+                } else {
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                        setIsFullScreen(false);
+                    }
+                }
+            };
+
+            const loadFromStorage = (key, defaultValue) => {
+                try {
+                    const saved = localStorage.getItem(key);
+                    return saved ? JSON.parse(saved) : defaultValue;
+                } catch (e) {
+                    return defaultValue;
+                }
+            };
+
+            const saveToStorage = (key, value) => {
+                try {
+                    localStorage.setItem(key, JSON.stringify(value));
+                } catch (e) {
+                    console.error('Error saving:', e);
+                }
+            };
+
+            const [inventory, setInventory] = useState(() => loadFromStorage('inventory', [
+                { id: 1, name: 'Monkey Breakfast', category: 'Food', price: 50, stock: 20 },
+                { id: 2, name: 'Cocktail Sausages & Chips', category: 'Food', price: 48, stock: 20 },
+                { id: 3, name: 'Beef Burger & Chips', category: 'Food', price: 60, stock: 20 },
+                { id: 4, name: 'Small Chips', category: 'Food', price: 25, stock: 30 },
+                { id: 5, name: 'Breakfast Bun + Chips', category: 'Food', price: 50, stock: 20 },
+                { id: 6, name: 'Bacon & Cheese', category: 'Food', price: 45, stock: 20 },
+                { id: 7, name: 'Chicken Wrap & Chips', category: 'Food', price: 70, stock: 15 },
+                { id: 8, name: 'Bacon, Egg & Cheese Pita', category: 'Food', price: 60, stock: 15 },
+                { id: 9, name: 'Ice Cream Scoop', category: 'Food', price: 5, stock: 50 },
+                { id: 10, name: 'Cheese Slice', category: 'Food', price: 5, stock: 50 },
+                { id: 11, name: 'Cheese', category: 'Food', price: 35, stock: 30 },
+                { id: 12, name: 'Flat White', category: 'Drinks', price: 30, stock: 20 },
+                { id: 13, name: 'Chicken Strip Burger', category: 'Food', price: 55, stock: 20 },
+                { id: 14, name: 'Chicken Mayo Toast', category: 'Food', price: 35, stock: 20 },
+                { id: 15, name: 'Bacon and Egg', category: 'Food', price: 54, stock: 20 },
+                { id: 16, name: 'Extra', category: 'Food', price: 5, stock: 50 },
+                { id: 17, name: 'Bacon & Cheese Burger', category: 'Food', price: 70, stock: 15 },
+                { id: 18, name: 'Chicken Mayo Pita', category: 'Food', price: 60, stock: 15 },
+                { id: 19, name: 'Bacon, Egg & Cheese', category: 'Food', price: 55, stock: 20 },
+                { id: 20, name: 'Cheese & Tomato', category: 'Food', price: 40, stock: 20 },
+                { id: 21, name: 'Kiddies Breakfast', category: 'Food', price: 35, stock: 25 },
+                { id: 22, name: 'Basket', category: 'Food', price: 50, stock: 20 },
+                { id: 23, name: 'Legends Lunch', category: 'Food', price: 90, stock: 15 },
+                { id: 24, name: 'Ham, Cheese & Tomato Pita', category: 'Food', price: 50, stock: 20 },
+                { id: 25, name: 'Vienna & Chips', category: 'Food', price: 30, stock: 25 },
+                { id: 26, name: 'Bacon', category: 'Food', price: 5, stock: 50 },
+                { id: 27, name: 'Elephant Breakfast', category: 'Food', price: 65, stock: 15 },
+                { id: 28, name: 'Platters', category: 'Food', price: 0, stock: 10 },
+                { id: 29, name: 'Donut', category: 'Food', price: 20, stock: 30 },
+                { id: 30, name: 'Ice Cream In A Cup', category: 'Food', price: 15, stock: 40 },
+                { id: 31, name: 'Sweet Flapjacks', category: 'Food', price: 40, stock: 20 },
+                { id: 32, name: 'Chicken Strips & Chips', category: 'Food', price: 55, stock: 20 },
+                { id: 33, name: 'Fish Fingers', category: 'Food', price: 40, stock: 20 },
+                { id: 34, name: 'MEAL SPECIAL', category: 'Food', price: 65, stock: 20 },
+                { id: 35, name: 'Chicken Mayo', category: 'Food', price: 55, stock: 20 },
+                { id: 36, name: 'Ham, Cheese & Tomato', category: 'Food', price: 45, stock: 20 },
+                { id: 37, name: 'Flapjack', category: 'Food', price: 35, stock: 25 },
+                { id: 38, name: 'Hotdog', category: 'Food', price: 35, stock: 25 },
+                { id: 39, name: 'Ham & Cheese', category: 'Food', price: 40, stock: 20 },
+                { id: 40, name: 'Burger Combo', category: 'Food', price: 75, stock: 15 },
+                { id: 41, name: 'TOASTIE COMBO', category: 'Food', price: 45, stock: 20 },
+                { id: 42, name: 'Sparkling Water', category: 'Drinks', price: 15, stock: 40 },
+                { id: 43, name: 'FREE SLUSH PUPPY', category: 'Drinks', price: 0, stock: 50 },
+                { id: 44, name: 'Latte', category: 'Drinks', price: 30, stock: 30 },
+                { id: 45, name: 'Milkshake Small', category: 'Drinks', price: 40, stock: 25 },
+                { id: 46, name: 'Slush Puppy', category: 'Drinks', price: 25, stock: 40 },
+                { id: 47, name: 'Ice Tea', category: 'Drinks', price: 20, stock: 35 },
+                { id: 48, name: 'Espresso - Double', category: 'Drinks', price: 28, stock: 30 },
+                { id: 49, name: 'Tea 5 Roses', category: 'Drinks', price: 26, stock: 30 },
+                { id: 50, name: 'Energade', category: 'Drinks', price: 25, stock: 35 },
+                { id: 51, name: 'Cappuccino Cream', category: 'Drinks', price: 35, stock: 25 },
+                { id: 52, name: 'Slush Puppy REFILL', category: 'Drinks', price: 20, stock: 50 },
+                { id: 53, name: 'Oros', category: 'Drinks', price: 15, stock: 40 },
+                { id: 54, name: 'Cappuccino Foam', category: 'Drinks', price: 30, stock: 25 },
+                { id: 55, name: 'Espresso - Single', category: 'Drinks', price: 20, stock: 30 },
+                { id: 56, name: 'Hot Chocolate', category: 'Drinks', price: 30, stock: 30 },
+                { id: 57, name: 'Softdrinks', category: 'Drinks', price: 20, stock: 50 },
+                { id: 58, name: 'Grapetizer', category: 'Drinks', price: 25, stock: 30 },
+                { id: 59, name: 'Milkshake Large', category: 'Drinks', price: 50, stock: 20 },
+                { id: 60, name: 'Filter Coffee', category: 'Drinks', price: 25, stock: 30 },
+                { id: 61, name: 'Liqui Fruit', category: 'Drinks', price: 25, stock: 35 },
+                { id: 62, name: 'Rhodes Juice Box', category: 'Drinks', price: 15, stock: 50 },
+                { id: 63, name: 'Americano', category: 'Drinks', price: 28, stock: 30 },
+                { id: 64, name: 'Tea Rooibos', category: 'Drinks', price: 27, stock: 30 },
+                { id: 65, name: 'Liqui Fruit Juice Box', category: 'Drinks', price: 15, stock: 50 },
+                { id: 66, name: 'Appletizer', category: 'Drinks', price: 25, stock: 30 },
+                { id: 67, name: 'Milo', category: 'Drinks', price: 30, stock: 30 },
+                { id: 68, name: 'Slush Puppy Refill', category: 'Drinks', price: 20, stock: 50 },
+                { id: 69, name: 'Still Water', category: 'Drinks', price: 15, stock: 50 },
+                { id: 70, name: 'Popcorn', category: 'Snacks', price: 5, stock: 60 },
+                { id: 71, name: 'FREE POPCORN', category: 'Snacks', price: 0, stock: 100 },
+                { id: 72, name: 'Rascals', category: 'Snacks', price: 15, stock: 40 },
+                { id: 73, name: 'School Package Option 4', category: 'Packages', price: 160, stock: 20 },
+                { id: 74, name: 'School Holiday Entrance', category: 'Packages', price: 90, stock: 50 },
+                { id: 75, name: 'Party Extras', category: 'Packages', price: 0, stock: 20 },
+                { id: 76, name: 'Party Package', category: 'Packages', price: 0, stock: 20 },
+                { id: 77, name: 'Entrance Midweek', category: 'Packages', price: 80, stock: 50 },
+                { id: 78, name: 'Entrance Weekend', category: 'Packages', price: 100, stock: 50 },
+                { id: 79, name: 'School Package Option 1', category: 'Packages', price: 85, stock: 30 },
+                { id: 80, name: 'Venue', category: 'Other', price: 0, stock: 10 },
+                { id: 81, name: 'Name On The Wall', category: 'Other', price: 0, stock: 50 },
+                { id: 82, name: 'Face Paint', category: 'Other', price: 20, stock: 30 },
+                { id: 83, name: 'Coloring Page + Crayons', category: 'Other', price: 10, stock: 50 },
+                { id: 84, name: 'Helium Balloons', category: 'Other', price: 0, stock: 100 },
+                { id: 85, name: 'Bee Teddies', category: 'Other', price: 100, stock: 20 },
+                { id: 86, name: 'Balloon Arch', category: 'Other', price: 500, stock: 5 },
+                { id: 87, name: 'Entertainment Small', category: 'Other', price: 150, stock: 10 },
+                { id: 88, name: 'Entertainment Large', category: 'Other', price: 250, stock: 10 },
+                { id: 89, name: 'R5', category: 'Other', price: 5, stock: 100 },
+                { id: 90, name: 'Chicken Mayo Toast ONLY', category: 'Food', price: 35, stock: 50 },
+            ]));
+
+           const [tables, setTables] = useState(() => loadFromStorage('tables', 
+    [
+        // MAIN AREA (1-13)
+        ...Array.from({length: 13}, (_, i) => ({
+            id: i + 1,
+            name: `Main ${i + 1}`,
+            status: 'available',
+            orders: [],
+            waiter: null,
+            description: ''
+        })),
+        // MONKEY AREA (20-24)
+        ...Array.from({length: 5}, (_, i) => ({
+            id: 20 + i,
+            name: `Monkey ${i + 1}`,
+            status: 'available',
+            orders: [],
+            waiter: null,
+            description: ''
+        })),
+        // ELEPHANT AREA (30-32)
+        ...Array.from({length: 3}, (_, i) => ({
+            id: 30 + i,
+            name: `Elephant ${i + 1}`,
+            status: 'available',
+            orders: [],
+            waiter: null,
+            description: ''
+        }))
+    ]
+));
+
+            const [waiters, setWaiters] = useState(() => loadFromStorage('waiters', [
+                { id: 1, name: 'Bronwyn', color: 'pink', sales: [] },
+                { id: 2, name: 'Jeney', color: 'purple', sales: [] },
+                { id: 3, name: 'Tristan', color: 'red', sales: [] },
+                { id: 4, name: 'El-ione', color: 'green', sales: [] },
+		{ id: 5, name: 'Jayden', color: 'blue', sales: [] },
+                { id: 6, name: 'Xante', color: 'green', sales: [] },
+                { id: 7, name: 'Jinelle', color: 'pink', sales: [] },
+                { id: 8, name: 'Managers', color: 'yellow', sales: [] },
+
+            ]));
+
+            const [sales, setSales] = useState(() => loadFromStorage('sales', []));
+            const [historicalSales, setHistoricalSales] = useState(() => loadFromStorage('historicalSales', []));
+
+            useEffect(() => { saveToStorage('inventory', inventory); }, [inventory]);
+            useEffect(() => { saveToStorage('tables', tables); }, [tables]);
+            useEffect(() => { saveToStorage('waiters', waiters); }, [waiters]);
+            useEffect(() => { saveToStorage('sales', sales); }, [sales]);
+            useEffect(() => { 
+                saveToStorage('historicalSales', historicalSales);
+                if (firebaseEnabled && historicalSales.length > 0) {
+                    syncToFirebase();
+                }
+            }, [historicalSales]);
+
+            const syncToFirebase = async () => {
+                if (!firebaseEnabled) return;
+                try {
+                    const batch = db.batch();
+                    historicalSales.forEach(sale => {
+                        const docRef = db.collection('sales').doc(sale.id.toString());
+                        batch.set(docRef, sale, { merge: true });
+                    });
+                    await batch.commit();
+                    console.log("Data synced to Firebase");
+                } catch (error) {
+                    console.error("Firebase sync error:", error);
+                }
+            };
+
+            useEffect(() => {
+                if (firebaseEnabled) {
+                    loadFromFirebase();
+                }
+            }, []);
+
+            const loadFromFirebase = async () => {
+                try {
+                    const salesSnapshot = await db.collection('sales').get();
+                    const firebaseSales = [];
+                    salesSnapshot.forEach(doc => {
+                        firebaseSales.push(doc.data());
+                    });
+                    if (firebaseSales.length > 0) {
+                        setHistoricalSales(firebaseSales);
+                        console.log("Loaded data from Firebase");
+                    }
+                } catch (error) {
+                    console.error("Firebase load error:", error);
+                }
+            };
+
+            const categories = ['Drinks', 'Snacks', 'Food', 'Packages', 'Other'];
+
+            const addMenuItem = () => {
+                if (!newItem.name || !newItem.price || !newItem.stock) {
+                    alert('Please fill in all fields!');
+                    return;
+                }
+                const newId = Math.max(...inventory.map(i => i.id), 0) + 1;
+                const item = {
+                    id: newId,
+                    name: newItem.name,
+                    category: newItem.category,
+                    price: parseFloat(newItem.price),
+                    stock: parseInt(newItem.stock)
+                };
+                setInventory([...inventory, item]);
+                setNewItem({ name: '', category: 'Drinks', price: '', stock: '' });
+                setShowAddItem(false);
+                alert('Menu item added successfully!');
+            };
+
+            const updateMenuItem = () => {
+                if (!newItem.name || !newItem.price || !newItem.stock) {
+                    alert('Please fill in all fields!');
+                    return;
+                }
+                setInventory(inventory.map(item => 
+                    item.id === newItem.id 
+                        ? {
+                            ...item,
+                            name: newItem.name,
+                            category: newItem.category,
+                            price: parseFloat(newItem.price),
+                            stock: parseInt(newItem.stock)
+                        }
+                        : item
+                ));
+                setShowAddItem(false);
+                setNewItem({ name: '', category: 'Drinks', price: '', stock: '' });
+                alert('Menu item updated successfully!');
+            };
+
+            const deleteMenuItem = (id) => {
+                if (window.confirm('Delete this menu item?')) {
+                    setInventory(inventory.filter(item => item.id !== id));
+                    alert('Item deleted!');
+                }
+            };
+
+            const updateStock = (id, newStock) => {
+                setInventory(inventory.map(item => 
+                    item.id === id ? { ...item, stock: parseInt(newStock) || 0 } : item
+                ));
+            };
+
+            const connectBluetoothPrinter = async () => {
+                try {
+                    const device = await navigator.bluetooth.requestDevice({
+                        filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }],
+                        optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
+                    });
+                    setBluetoothDevice(device);
+                    alert('Bluetooth printer connected!');
+                    saveToStorage('bluetoothDeviceId', device.id);
+                } catch (error) {
+                    console.error('Bluetooth connection failed:', error);
+                    alert('Failed to connect to printer. Make sure Bluetooth is enabled.');
+                }
+            };
+
+            const printViaBluetooth = async (content) => {
+                if (!bluetoothDevice) {
+                    return false;
+                }
+                try {
+                    const server = await bluetoothDevice.gatt.connect();
+                    const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+                    const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+                    const encoder = new TextEncoder();
+                    const data = encoder.encode(content);
+                    await characteristic.writeValue(data);
+                    return true;
+                } catch (error) {
+                    console.error('Bluetooth print failed:', error);
+                    return false;
+                }
+            };
+
+            const exportAllData = () => {
+                const exportData = {
+                    version: '1.0',
+                    exportDate: new Date().toISOString(),
+                    inventory,
+                    tables,
+                    waiters,
+                    sales,
+                    historicalSales
+                };
+                const dataStr = JSON.stringify(exportData, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `little-jungle-backup-${new Date().toISOString().split('T')[0]}.json`;
+                a.click();
+                window.URL.revokeObjectURL(url);
+                alert('Data exported successfully!');
+            };
+
+            const importData = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const importData = JSON.parse(e.target.result);
+                        if (window.confirm('Import data? This will replace current data.')) {
+                            if (importData.inventory) setInventory(importData.inventory);
+                            if (importData.tables) setTables(importData.tables);
+                            if (importData.waiters) setWaiters(importData.waiters);
+                            if (importData.sales) setSales(importData.sales);
+                            if (importData.historicalSales) setHistoricalSales(importData.historicalSales);
+                            alert('Data imported successfully!');
+                        }
+                    } catch (error) {
+                        alert('Error importing data. Please check the file format.');
+                        console.error('Import error:', error);
+                    }
+                };
+                reader.readAsText(file);
+            };
+
+            const addToCart = (item) => {
+                const existingItem = cart.find(i => i.id === item.id);
+                if (existingItem) {
+                    if (existingItem.quantity < item.stock) {
+                        setCart(cart.map(i => 
+                            i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
+                        ));
+                    }
+                } else {
+                    setCart([...cart, { ...item, quantity: 1 }]);
+                }
+            };
+
+            const updateQuantity = (id, change) => {
+                setCart(cart.map(item => {
+                    if (item.id === id) {
+                        const newQty = item.quantity + change;
+                        if (newQty <= 0) return null;
+                        return { ...item, quantity: newQty };
+                    }
+                    return item;
+                }).filter(Boolean));
+            };
+
+            const removeFromCart = (id) => {
+                setCart(cart.filter(item => item.id !== id));
+            };
+
+            const voidItemFromTable = (itemIndex) => {
+                if (window.confirm('Void this item from the table?')) {
+                    const updatedOrders = selectedTable.orders.filter((_, idx) => idx !== itemIndex);
+                    setTables(tables.map(t => 
+                        t.id === selectedTable.id ? { ...t, orders: updatedOrders } : t
+                    ));
+                    setSelectedTable({ ...selectedTable, orders: updatedOrders });
+                }
+            };
+
+            const getTotal = (items = cart) => {
+                return items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            };
+
+            const openTableWithDescription = () => {
+                if (!selectedWaiter) {
+                    alert('Please select a waiter first!');
+                    return;
+                }
+                setTables(tables.map(t => 
+                    t.id === pendingTable.id 
+                        ? { ...t, status: 'occupied', waiter: selectedWaiter, description: tableDescription }
+                        : t
+                ));
+                const updatedTable = { ...pendingTable, waiter: selectedWaiter, description: tableDescription, status: 'occupied' };
+                setSelectedTable(updatedTable);
+                setShowDescriptionModal(false);
+                setShowWaiterSelect(false);
+                setTableDescription('');
+                setPendingTable(null);
+                setShowOrderModal(true);
+            };
+
+            const openTable = (table) => {
+                setPendingTable(table);
+                setShowWaiterSelect(true);
+            };
+
+            const selectWaiter = (waiter) => {
+                setSelectedWaiter(waiter);
+                setShowWaiterSelect(false);
+                setShowDescriptionModal(true);
+            };
+
+            const addItemsToTable = (table) => {
+                setSelectedTable(table);
+                setShowOrderModal(true);
+            };
+
+            const addToTableOrder = () => {
+                if (cart.length === 0 || !selectedTable) return;
+                const table = tables.find(t => t.id === selectedTable.id);
+                const updatedOrders = [...table.orders, ...cart];
+                setTables(tables.map(t => 
+                    t.id === selectedTable.id ? { ...t, orders: updatedOrders } : t
+                ));
+                setSelectedTable({ ...selectedTable, orders: updatedOrders });
+                setCart([]);
+                alert('Items added to table!');
+            };
+
+            const openPaymentModal = (table) => {
+                setSelectedTable(table);
+                setShowPaymentModal(true);
+                setAmountReceived('');
+                setTipAmount('0');
+                setSelectedPaymentMethod(null);
+            };
+
+            const finalizePayment = () => {
+                if (!selectedPaymentMethod) {
+                    alert('Please select payment method!');
+                    return;
+                }
+                const billTotal = getTotal(selectedTable.orders);
+                const tip = parseFloat(tipAmount) || 0;
+                const total = billTotal + tip;
+                const received = parseFloat(amountReceived) || 0;
+                if (selectedPaymentMethod === 'Cash' && received < total) {
+                    alert(`Insufficient! Need R${total.toFixed(2)}`);
+                    return;
+                }
+                const change = selectedPaymentMethod === 'Cash' ? received - total : 0;
+                const sale = {
+                    id: Date.now(),
+                    tableName: selectedTable.name,
+                    waiter: selectedTable.waiter,
+                    items: [...selectedTable.orders],
+                    subtotal: billTotal,
+                    tip: tip,
+                    total: total,
+                    paymentMethod: selectedPaymentMethod,
+                    timestamp: new Date().toLocaleString(),
+                    date: new Date().toISOString().split('T')[0],
+                    description: selectedTable.description
+                };
+                setSales([sale, ...sales]);
+                setHistoricalSales([sale, ...historicalSales]);
+                // FIXED: Update waiter's sales array
+                setWaiters(waiters.map(w => 
+                    w.id === selectedTable.waiter.id 
+                        ? { ...w, sales: [...w.sales, sale] } 
+                        : w
+                ));
+                setInventory(inventory.map(item => {
+                    const orderItem = selectedTable.orders.find(o => o.id === item.id);
+                    if (orderItem) {
+                        return { ...item, stock: item.stock - orderItem.quantity };
+                    }
+                    return item;
+                }));
+                setTables(tables.map(t => 
+                    t.id === selectedTable.id 
+                        ? { ...t, status: 'available', orders: [], waiter: null, description: '' }
+                        : t
+                ));
+                if (change > 0) {
+                    alert(`Payment completed!\nChange: R${change.toFixed(2)}`);
+                } else {
+                    alert('Payment completed!');
+                }
+                setShowPaymentModal(false);
+                setSelectedTable(null);
+            };
+
+            const finalizeDayCashUp = () => {
+                if (window.confirm('Finalize day? This will print consolidated report and reset daily data.')) {
+                    printConsolidatedReport();
+                    setTimeout(() => {
+                        setSales([]);
+                        setWaiters(waiters.map(w => ({ ...w, sales: [] })));
+                        alert('Day finalized! Report printed. Historical data preserved.');
+                    }, 1000);
+                }
+            };
+
+            const filteredInventory = selectedCategory === 'All' 
+                ? inventory 
+                : inventory.filter(item => item.category === selectedCategory);
+
+            const getTodaySales = () => sales.reduce((sum, s) => sum + s.total, 0);
+
+            // FIXED: Sales by Waiter Function - SAFE VERSION
+            const getSalesByWaiter = () => {
+                const filteredSales = getFilteredSales();
+                return waiters.map(waiter => {
+                    const waiterSales = filteredSales.filter(sale => 
+                        sale.waiter && sale.waiter.id === waiter.id
+                    );
+                    const totalSales = waiterSales.reduce((sum, s) => sum + s.total, 0);
+                    const totalTips = waiterSales.reduce((sum, s) => sum + (s.tip || 0), 0);
+                    const transactions = waiterSales.length;
+                    const itemsSold = waiterSales.reduce((sum, s) => 
+                        sum + s.items.reduce((iSum, i) => iSum + (i.quantity || 0), 0), 0
+                    );
+                    
+                    return {
+                        ...waiter,
+                        totalSales,
+                        totalTips,
+                        transactions,
+                        itemsSold,
+                        avgSale: transactions > 0 ? (totalSales / transactions).toFixed(2) : '0.00'
+                    };
+                }).sort((a, b) => b.totalSales - a.totalSales);
+            };
+
+            // FIXED: getFilteredSales function
+            const getFilteredSales = () => {
+                if (!dateFilter.start && !dateFilter.end) return historicalSales;
+                return historicalSales.filter(sale => {
+                    const saleDate = new Date(sale.date);
+                    const startDate = dateFilter.start ? new Date(dateFilter.start) : null;
+                    const endDate = dateFilter.end ? new Date(dateFilter.end) : null;
+                    if (startDate && saleDate < startDate) return false;
+                    if (endDate && saleDate > endDate) return false;
+                    return true;
+                });
+            };
+
+            const printBill = async (table) => {
+                const textContent = `
+Little Jungle Playground
+${new Date().toLocaleString()}
+----------------------------
+${table.name}
+Waiter: ${table.waiter?.name || 'N/A'}
+${table.description ? `Note: ${table.description}\n` : ''}----------------------------
+${table.orders.map(item => `${item.quantity}x ${item.name.padEnd(15)} R${(item.price * item.quantity).toFixed(2)}`).join('\n')}
+----------------------------
+TOTAL: R${getTotal(table.orders).toFixed(2)}
+----------------------------
+Thank you for visiting!
+                `;
+                const bluetoothSuccess = await printViaBluetooth(textContent);
+                if (!bluetoothSuccess) {
+                    const billWindow = window.open('', '_blank');
+                    billWindow.document.write(`
+                        <!DOCTYPE html>
+                        <html><head><title>Bill</title><style>
+                            body{font-family:monospace;padding:20px;max-width:300px;margin:0 auto}
+                            h1{text-align:center;font-size:18px}
+                            .item{display:flex;justify-content:space-between;margin:5px 0}
+                        </style></head><body>
+                        <h1>Little Jungle Playground</h1>
+                        <p>${new Date().toLocaleString()}</p>
+                        <p><strong>${table.name}</strong></p>
+                        <p>Waiter: ${table.waiter?.name || 'N/A'}</p>
+                        ${table.description ? `<p>Note: ${table.description}</p>` : ''}
+                        <hr>
+                        ${table.orders.map(item => `<div class="item"><span>${item.quantity}x ${item.name}</span><span>R${(item.price * item.quantity).toFixed(2)}</span></div>`).join('')}
+                        <hr>
+                        <div class="item"><strong>TOTAL:</strong><strong>R${getTotal(table.orders).toFixed(2)}</strong></div>
+                        <p style="text-align:center;margin-top:20px">Thank you!</p>
+                        <button onclick="window.close()" style="display:block;margin:20px auto;padding:10px 20px;background:#007bff;color:white;border:none;border-radius:5px;cursor:pointer;">Close</button>
+                        </body></html>
+                    `);
+                    billWindow.document.close();
+                    setTimeout(() => billWindow.print(), 250);
+                }
+            };
+
+            const printConsolidatedReport = async () => {
+                const filteredSales = getFilteredSales();
+                const totalSales = filteredSales.reduce((sum, s) => sum + s.total, 0);
+                const totalTips = filteredSales.reduce((sum, s) => sum + (s.tip || 0), 0);
+                const cashSales = filteredSales.filter(s => s.paymentMethod === 'Cash').reduce((sum, s) => sum + s.total, 0);
+                const cardSales = filteredSales.filter(s => s.paymentMethod === 'Card').reduce((sum, s) => sum + s.total, 0);
+                
+                const reportWindow = window.open('', '_blank');
+                reportWindow.document.write(`
+                    <!DOCTYPE html><html><head><title>Report</title><style>
+                    body{font-family:monospace;padding:10px;max-width:300px;margin:0 auto;font-size:12px}
+                    .row{display:flex;justify-content:space-between;margin:3px 0}
+                    </style></head><body>
+                    <h2 style="text-align:center">LITTLE JUNGLE PLAYGROUND</h2>
+                    <p style="text-align:center">DAILY REPORT</p>
+                    <p style="text-align:center">${new Date().toLocaleString()}</p>
+                    <hr>
+                    <div class="row"><strong>TOTAL SALES:</strong><strong>R${totalSales.toFixed(2)}</strong></div>
+                    <div class="row"><span>Tips:</span><span>R${totalTips.toFixed(2)}</span></div>
+                    <div class="row"><span>Cash:</span><span>R${cashSales.toFixed(2)}</span></div>
+                    <div class="row"><span>Card:</span><span>R${cardSales.toFixed(2)}</span></div>
+                    <div class="row"><span>Transactions:</span><span>${filteredSales.length}</span></div>
+                    <hr>
+                    ${filteredSales.map(sale => `
+                        <p><strong>${sale.tableName} - ${sale.waiter?.name || 'N/A'}</strong></p>
+                        <p>${sale.timestamp}</p>
+                        <p>R${sale.total.toFixed(2)} (${sale.paymentMethod})</p>
+                        <hr>
+                    `).join('')}
+                    <p style="text-align:center">Little Jungle Playground</p>
+                    <button onclick="window.close()" style="display:block;margin:20px auto;padding:10px 20px;background:#007bff;color:white;border:none;border-radius:5px;cursor:pointer;">Close</button>
+                    </body></html>
+                `);
+                reportWindow.document.close();
+                setTimeout(() => reportWindow.print(), 250);
+            };
+
+            const exportToCSV = (data, filename) => {
+                const csvRows = [];
+                csvRows.push('Date,Table,Waiter,Description,Items,Subtotal,Tip,Total,Payment Method');
+                data.forEach(sale => {
+                    const itemsList = sale.items.map(i => `${i.quantity}x ${i.name}`).join('; ');
+                    csvRows.push([
+                        sale.timestamp,
+                        sale.tableName,
+                        sale.waiter?.name || 'N/A',
+                        `"${sale.description || ''}"`,
+                        `"${itemsList}"`,
+                        sale.subtotal.toFixed(2),
+                        sale.tip.toFixed(2),
+                        sale.total.toFixed(2),
+                        sale.paymentMethod
+                    ].join(','));
+                });
+                const csvContent = csvRows.join('\n');
+                const blob = new Blob([csvContent], { type: 'text/csv' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                a.click();
+                window.URL.revokeObjectURL(url);
+            };
+
+            return (
+                <div className="min-h-screen bg-gradient-to-br from-green-400 via-yellow-300 to-orange-400 p-4">
+                    <div className="max-w-7xl mx-auto">
+                        <div className="bg-white rounded-t-2xl shadow-lg p-6 mb-2">
+                            <div className="flex items-center justify-between flex-wrap gap-4">
+                                <div>
+                                    <h1 className="text-3xl font-bold text-green-600">Little Jungle Playground</h1>
+                                    <p className="text-gray-600">Point of Sale System</p>
+                                </div>
+                                <div className="flex gap-4 items-center">
+                                    <button
+                                        onClick={() => setShowSettings(true)}
+                                        className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-semibold"
+                                    >
+                                        ⚙️ Settings
+                                    </button>
+                                    <button
+                                        onClick={toggleFullScreen}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold"
+                                    >
+                                        {isFullScreen ? '📴 Exit Full Screen' : '📺 Full Screen'}
+                                    </button>
+                                    <div className="text-right">
+                                        <p className="text-sm text-gray-500">Today's Sales</p>
+                                        <p className="text-2xl font-bold text-green-600">R{getTodaySales().toFixed(2)}</p>
+                                        {firebaseEnabled && <p className="text-xs text-blue-600">☁️ Cloud Enabled</p>}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-white shadow-lg mb-2">
+                            <div className="flex border-b overflow-x-auto">
+                                <button onClick={() => setActiveTab('tables')} className={`flex-1 py-4 px-6 font-semibold ${activeTab === 'tables' ? 'bg-green-500 text-white' : 'bg-gray-100'}`}>
+                                    Tables
+                                </button>
+                                <button onClick={() => setActiveTab('menu')} className={`flex-1 py-4 px-6 font-semibold ${activeTab === 'menu' ? 'bg-green-500 text-white' : 'bg-gray-100'}`}>
+                                    Menu
+                                </button>
+                                <button onClick={() => setActiveTab('reports')} className={`flex-1 py-4 px-6 font-semibold ${activeTab === 'reports' ? 'bg-green-500 text-white' : 'bg-gray-100'}`}>
+                                    Reports
+                                </button>
+                                <button onClick={() => setActiveTab('cashup')} className={`flex-1 py-4 px-6 font-semibold ${activeTab === 'cashup' ? 'bg-green-500 text-white' : 'bg-gray-100'}`}>
+                                    Cash Up
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Waiter Selection Modal */}
+                        {showWaiterSelect && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                                <div className="bg-white rounded-2xl p-8 max-w-md w-full">
+                                    <h2 className="text-2xl font-bold mb-6">Select Waiter</h2>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {waiters.map(w => (
+                                            <button
+                                                key={w.id}
+                                                onClick={() => selectWaiter(w)}
+                                                style={{
+                                                    backgroundColor: w.color === 'pink' ? '#ec4899' : 
+                                                                    w.color === 'blue' ? '#3b82f6' : 
+                                                                    w.color === 'purple' ? '#a855f7' : 
+                                                                    w.color === 'green' ? '#22c55e' : '#6b7280'
+                                                }}
+                                                className="text-white p-6 rounded-lg font-bold text-lg hover:opacity-90"
+                                            >
+                                                {w.name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <button onClick={() => {
+                                        setShowWaiterSelect(false);
+                                        setPendingTable(null);
+                                    }} className="mt-4 w-full bg-gray-300 py-2 rounded-lg">
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Settings Modal */}
+                        {showSettings && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                                <div className="bg-white rounded-2xl p-8 max-w-2xl w-full max-h-screen overflow-y-auto">
+                                    <h2 className="text-2xl font-bold mb-6">Settings</h2>
+                                    <div className="space-y-6">
+                                        <div className="border-2 border-gray-200 rounded-lg p-4">
+                                            <h3 className="text-lg font-bold mb-3">🖨️ Bluetooth Printer</h3>
+                                            <p className="text-sm text-gray-600 mb-4">Connect a bluetooth thermal printer for receipt printing.</p>
+                                            <button onClick={connectBluetoothPrinter} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold">
+                                                {bluetoothDevice ? '✓ Connected' : 'Connect Printer'}
+                                            </button>
+                                        </div>
+                                        <div className="border-2 border-gray-200 rounded-lg p-4">
+                                            <h3 className="text-lg font-bold mb-3">☁️ Cloud Database</h3>
+                                            <p className="text-sm text-gray-600 mb-4">
+                                                {firebaseEnabled ? '✓ Firebase is enabled and syncing automatically.' : 'Firebase not configured.'}
+                                            </p>
+                                            {firebaseEnabled && (
+                                                <button onClick={() => { syncToFirebase(); alert('Synced!'); }} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold">
+                                                    Sync Now
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div className="border-2 border-gray-200 rounded-lg p-4">
+                                            <h3 className="text-lg font-bold mb-3">💾 Backup & Restore</h3>
+                                            <div className="flex gap-3">
+                                                <button onClick={exportAllData} className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg font-semibold">
+                                                    📥 Export
+                                                </button>
+                                                <button onClick={() => fileInputRef.current?.click()} className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg font-semibold">
+                                                    📤 Import
+                                                </button>
+                                                <input ref={fileInputRef} type="file" accept=".json" onChange={importData} style={{ display: 'none' }} />
+                                            </div>
+                                        </div>
+                                        <div className="border-2 border-gray-200 rounded-lg p-4">
+                                            <h3 className="text-lg font-bold mb-3">📊 Data Info</h3>
+                                            <div className="space-y-2 text-sm">
+                                                <div className="flex justify-between"><span>Historical Sales:</span><span className="font-bold">{historicalSales.length}</span></div>
+                                                <div className="flex justify-between"><span>Today's Sales:</span><span className="font-bold">{sales.length}</span></div>
+                                                <div className="flex justify-between"><span>Menu Items:</span><span className="font-bold">{inventory.length}</span></div>
+                                                <div className="flex justify-between"><span>Tables:</span><span className="font-bold">{tables.length}</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setShowSettings(false)} className="mt-6 w-full bg-gray-300 hover:bg-gray-400 py-3 rounded-lg font-semibold">
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Add/Edit Item Modal */}
+                        {showAddItem && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                                <div className="bg-white rounded-2xl p-8 max-w-md w-full">
+                                    <h2 className="text-2xl font-bold mb-6">
+                                        {newItem.id ? 'Edit Menu Item' : 'Add Menu Item'}
+                                    </h2>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block font-semibold mb-2">Item Name</label>
+                                            <input 
+                                                type="text" 
+                                                value={newItem.name} 
+                                                onChange={(e) => setNewItem({...newItem, name: e.target.value})}
+                                                className="w-full px-4 py-3 border-2 rounded-lg" 
+                                                placeholder="e.g., Milkshake" 
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block font-semibold mb-2">Category</label>
+                                            <select 
+                                                value={newItem.category} 
+                                                onChange={(e) => setNewItem({...newItem, category: e.target.value})}
+                                                className="w-full px-4 py-3 border-2 rounded-lg"
+                                            >
+                                                <option value="Drinks">Drinks</option>
+                                                <option value="Snacks">Snacks</option>
+                                                <option value="Food">Food</option>
+                                                <option value="Packages">Packages</option>
+                                                <option value="Other">Other</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block font-semibold mb-2">Price (R)</label>
+                                            <input 
+                                                type="number" 
+                                                value={newItem.price} 
+                                                onChange={(e) => setNewItem({...newItem, price: e.target.value})}
+                                                className="w-full px-4 py-3 border-2 rounded-lg" 
+                                                placeholder="0.00" 
+                                                step="0.01" 
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block font-semibold mb-2">Stock</label>
+                                            <input 
+                                                type="number" 
+                                                value={newItem.stock} 
+                                                onChange={(e) => setNewItem({...newItem, stock: e.target.value})}
+                                                className="w-full px-4 py-3 border-2 rounded-lg" 
+                                                placeholder="0" 
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2 mt-6">
+                                        <button 
+                                            onClick={newItem.id ? updateMenuItem : addMenuItem} 
+                                            className="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg font-bold"
+                                        >
+                                            {newItem.id ? 'Update Item' : 'Add Item'}
+                                        </button>
+                                        <button 
+                                            onClick={() => { 
+                                                setShowAddItem(false); 
+                                                setNewItem({ name: '', category: 'Drinks', price: '', stock: '' }); 
+                                            }} 
+                                            className="w-full bg-gray-300 py-2 rounded-lg"
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Description Modal */}
+                        {showDescriptionModal && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                                <div className="bg-white rounded-2xl p-8 max-w-md w-full">
+                                    <h2 className="text-2xl font-bold mb-6">Add Table Description</h2>
+                                    <p className="text-gray-600 mb-4">Add a note for this table (optional)</p>
+                                    <textarea value={tableDescription} onChange={(e) => setTableDescription(e.target.value)} className="w-full px-4 py-3 border-2 rounded-lg mb-4" placeholder="e.g., Birthday party, 5 kids..." rows="4" />
+                                    <div className="space-y-2">
+                                        <button onClick={openTableWithDescription} className="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg font-bold">
+                                            Open Table
+                                        </button>
+                                        <button onClick={() => { setShowDescriptionModal(false); setTableDescription(''); setSelectedWaiter(null); setPendingTable(null); }} className="w-full bg-gray-300 py-2 rounded-lg">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Order Modal */}
+                        {showOrderModal && selectedTable && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                                <div className="bg-white rounded-2xl p-6 max-w-6xl w-full max-h-screen overflow-y-auto">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <div>
+                                            <h2 className="text-2xl font-bold">{selectedTable.name} - Add Items</h2>
+                                            <p className="text-sm text-gray-600">Waiter: {selectedTable.waiter?.name}</p>
+                                        </div>
+                                        <button onClick={() => { setShowOrderModal(false); setCart([]); }} className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                                            Close
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                        <div className="lg:col-span-2">
+                                            <div className="mb-4 flex gap-2 flex-wrap">
+                                                {categories.map(cat => (
+                                                    <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-4 py-2 rounded-full font-semibold ${selectedCategory === cat ? 'bg-green-500 text-white' : 'bg-gray-200'}`}>
+                                                        {cat}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-4 max-h-96 overflow-y-auto">
+                                                {filteredInventory.map(item => (
+                                                    <button key={item.id} onClick={() => addToCart(item)} disabled={item.stock === 0} className={`p-4 rounded-lg border-2 ${item.stock === 0 ? 'bg-gray-100 cursor-not-allowed' : 'bg-white border-green-300 hover:shadow-lg'}`}>
+                                                        <p className="font-semibold text-sm">{item.name}</p>
+                                                        <p className="text-green-600 font-bold">R{item.price}</p>
+                                                        <p className="text-xs text-gray-500">Stock: {item.stock}</p>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-4">
+                                            <div className="bg-gray-50 rounded-lg p-4">
+                                                <h3 className="text-lg font-bold mb-4">Current Cart</h3>
+                                                {cart.length === 0 ? (
+                                                    <p className="text-gray-500 text-center py-4">Cart is empty</p>
+                                                ) : (
+                                                    <>
+                                                        <div className="space-y-2 mb-4 max-h-48 overflow-y-auto">
+                                                            {cart.map(item => (
+                                                                <div key={item.id} className="bg-white p-2 rounded-lg">
+                                                                    <div className="flex justify-between items-start mb-1">
+                                                                        <div>
+                                                                            <p className="font-semibold text-sm">{item.name}</p>
+                                                                            <p className="text-xs text-gray-600">R{item.price} each</p>
+                                                                        </div>
+                                                                        <button onClick={() => removeFromCart(item.id)} className="text-red-500 hover:text-red-700 text-sm">✕</button>
+                                                                    </div>
+                                                                    <div className="flex items-center justify-between">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <button onClick={() => updateQuantity(item.id, -1)} className="bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded text-sm">-</button>
+                                                                            <span className="font-bold w-6 text-center text-sm">{item.quantity}</span>
+                                                                            <button onClick={() => updateQuantity(item.id, 1)} className="bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded text-sm">+</button>
+                                                                        </div>
+                                                                        <p className="font-bold text-green-600 text-sm">R{item.price * item.quantity}</p>
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        <div className="border-t pt-3">
+                                                            <div className="flex justify-between items-center mb-3">
+                                                                <span className="font-bold">Cart Total:</span>
+                                                                <span className="text-xl font-bold text-green-600">R{getTotal()}</span>
+                                                            </div>
+                                                            <button onClick={addToTableOrder} className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-2 rounded-lg">
+                                                                Add to Table
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                            <div className="bg-blue-50 rounded-lg p-4">
+                                                <h3 className="text-lg font-bold mb-3">Table Order</h3>
+                                                {selectedTable.orders.length === 0 ? (
+                                                    <p className="text-gray-500 text-center py-4">No items yet</p>
+                                                ) : (
+                                                    <>
+                                                        <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
+                                                            {selectedTable.orders.map((item, idx) => (
+                                                                <div key={idx} className="bg-white p-2 rounded-lg flex justify-between items-center">
+                                                                    <div>
+                                                                        <p className="font-semibold text-sm">{item.quantity}x {item.name}</p>
+                                                                        <p className="text-xs text-gray-600">R{item.price * item.quantity}</p>
+                                                                    </div>
+                                                                    <button onClick={() => voidItemFromTable(idx)} className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs">
+                                                                        Void
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        <div className="border-t pt-3">
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="font-bold">Table Total:</span>
+                                                                <span className="text-xl font-bold text-blue-600">R{getTotal(selectedTable.orders)}</span>
+                                                            </div>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Payment Modal */}
+                        {showPaymentModal && selectedTable && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                                <div className="bg-white rounded-2xl p-8 max-w-lg w-full max-h-screen overflow-y-auto">
+                                    <h2 className="text-2xl font-bold mb-4">{selectedTable.name} - Payment</h2>
+                                    <div className="bg-gray-100 p-4 rounded-lg mb-6">
+                                        <div className="flex justify-between mb-2">
+                                            <span>Subtotal:</span>
+                                            <span className="font-bold">R{getTotal(selectedTable.orders).toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between mb-2">
+                                            <span>Tip:</span>
+                                            <span className="font-bold text-green-600">R{parseFloat(tipAmount || 0).toFixed(2)}</span>
+                                        </div>
+                                        <div className="border-t pt-2 flex justify-between">
+                                            <span className="text-lg font-bold">Total:</span>
+                                            <span className="text-2xl font-bold text-green-600">R{(getTotal(selectedTable.orders) + parseFloat(tipAmount || 0)).toFixed(2)}</span>
+                                        </div>
+                                    </div>
+                                    <div className="mb-4">
+                                        <label className="block font-semibold mb-2">Tip Amount</label>
+                                        <input type="number" value={tipAmount} onChange={(e) => setTipAmount(e.target.value)} className="w-full px-4 py-3 border-2 rounded-lg" placeholder="0.00" />
+                                        <div className="grid grid-cols-3 gap-2 mt-2">
+                                            {[10, 15, 20].map(p => (
+                                                <button key={p} onClick={() => setTipAmount((getTotal(selectedTable.orders) * p / 100).toFixed(2))} className="bg-gray-200 hover:bg-gray-300 py-2 rounded">
+                                                    {p}%
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    <p className="font-semibold mb-3">Payment method:</p>
+                                    <div className="grid grid-cols-2 gap-3 mb-4">
+                                        <button onClick={() => setSelectedPaymentMethod('Cash')} className={`p-4 rounded-lg font-bold border-2 ${selectedPaymentMethod === 'Cash' ? 'bg-green-500 text-white' : 'bg-gray-100'}`}>
+                                            Cash
+                                        </button>
+                                        <button onClick={() => setSelectedPaymentMethod('Card')} className={`p-4 rounded-lg font-bold border-2 ${selectedPaymentMethod === 'Card' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}>
+                                            Card
+                                        </button>
+                                    </div>
+                                    {selectedPaymentMethod === 'Cash' && (
+                                        <div className="mb-4">
+                                            <label className="block font-semibold mb-2">Amount Received</label>
+                                            <input type="number" value={amountReceived} onChange={(e) => setAmountReceived(e.target.value)} className="w-full px-4 py-3 border-2 rounded-lg" placeholder="0.00" />
+                                            {amountReceived && (
+                                                <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                                                    <p className="text-sm">Change:</p>
+                                                    <p className="text-2xl font-bold text-blue-600">R{Math.max(0, parseFloat(amountReceived) - (getTotal(selectedTable.orders) + parseFloat(tipAmount || 0))).toFixed(2)}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                    <div className="space-y-3">
+                                        <button onClick={finalizePayment} className="w-full bg-green-500 hover:bg-green-600 text-white p-4 rounded-lg font-bold">
+                                            Complete Payment
+                                        </button>
+                                        <button onClick={() => { setShowPaymentModal(false); setAmountReceived(''); setTipAmount('0'); setSelectedPaymentMethod(null); }} className="w-full bg-gray-300 hover:bg-gray-400 py-3 rounded-lg">
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Main Content */}
+                        <div className="bg-white rounded-b-2xl shadow-lg p-6">
+                            {activeTab === 'tables' && (
+    <div>
+        <h2 className="text-2xl font-bold mb-6">Floor Plan</h2>
+        
+        {/* SECTION 1: MAIN AREA */}
+        <div className="mb-8">
+            <div className="flex items-center mb-4">
+                <div className="w-4 h-4 bg-blue-500 rounded mr-2"></div>
+                <h3 className="text-xl font-bold text-blue-800">🏢 MAIN AREA (Tables 1-13)</h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                {tables.filter(table => [1,2,3,4,5,6,7,8,9,10,11,12,13].includes(table.id)).map(table => (
+                    <div key={table.id} className={`border-2 rounded-lg p-4 ${table.status === 'available' ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
+                        <div className="text-center mb-3">
+                            <h3 className="text-lg font-bold">{table.name}</h3>
+                            <p className={`text-xs font-semibold ${table.status === 'available' ? 'text-green-600' : 'text-red-600'}`}>
+                                {table.status === 'available' ? 'Available' : 'Occupied'}
+                            </p>
+                        </div>
+                        {table.status === 'available' ? (
+                            <button onClick={() => openTable(table)} className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-sm font-semibold">
+                                Open
+                            </button>
+                        ) : (
+                            <div>
+                                <div className="text-xs mb-2">
+                                    <p>Waiter: <span className="font-semibold">{table.waiter?.name}</span></p>
+                                    <p>Items: <span className="font-semibold">{table.orders.length}</span></p>
+                                    <p>Total: <span className="font-semibold text-green-600">R{getTotal(table.orders)}</span></p>
+                                </div>
+                                <div className="space-y-1">
+                                    <button onClick={() => addItemsToTable(table)} className="w-full bg-blue-500 hover:bg-blue-600 text-white py-1 rounded text-xs font-semibold">
+                                        Add Items
+                                    </button>
+                                    <button onClick={() => printBill(table)} className="w-full bg-purple-500 hover:bg-purple-600 text-white py-1 rounded text-xs font-semibold">
+                                        Print
+                                    </button>
+                                    <button onClick={() => openPaymentModal(table)} className="w-full bg-green-500 hover:bg-green-600 text-white py-1 rounded text-xs font-semibold">
+                                        Payment
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+
+        {/* SECTION 2: MONKEY AREA */}
+        <div className="mb-8">
+            <div className="flex items-center mb-4">
+                <div className="w-4 h-4 bg-orange-500 rounded mr-2"></div>
+                <h3 className="text-xl font-bold text-orange-800">🐒 MONKEY AREA (Tables 20-24)</h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {tables.filter(table => [20,21,22,23,24].includes(table.id)).map(table => (
+                    <div key={table.id} className={`border-2 rounded-lg p-4 ${table.status === 'available' ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
+                        <div className="text-center mb-3">
+                            <h3 className="text-lg font-bold">{table.name}</h3>
+                            <p className={`text-xs font-semibold ${table.status === 'available' ? 'text-green-600' : 'text-red-600'}`}>
+                                {table.status === 'available' ? 'Available' : 'Occupied'}
+                            </p>
+                        </div>
+                        {table.status === 'available' ? (
+                            <button onClick={() => openTable(table)} className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-sm font-semibold">
+                                Open
+                            </button>
+                        ) : (
+                            <div>
+                                <div className="text-xs mb-2">
+                                    <p>Waiter: <span className="font-semibold">{table.waiter?.name}</span></p>
+                                    <p>Items: <span className="font-semibold">{table.orders.length}</span></p>
+                                    <p>Total: <span className="font-semibold text-green-600">R{getTotal(table.orders)}</span></p>
+                                </div>
+                                <div className="space-y-1">
+                                    <button onClick={() => addItemsToTable(table)} className="w-full bg-blue-500 hover:bg-blue-600 text-white py-1 rounded text-xs font-semibold">
+                                        Add Items
+                                    </button>
+                                    <button onClick={() => printBill(table)} className="w-full bg-purple-500 hover:bg-purple-600 text-white py-1 rounded text-xs font-semibold">
+                                        Print
+                                    </button>
+                                    <button onClick={() => openPaymentModal(table)} className="w-full bg-green-500 hover:bg-green-600 text-white py-1 rounded text-xs font-semibold">
+                                        Payment
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+
+        {/* SECTION 3: ELEPHANT AREA */}
+        <div className="mb-8">
+            <div className="flex items-center mb-4">
+                <div className="w-4 h-4 bg-purple-500 rounded mr-2"></div>
+                <h3 className="text-xl font-bold text-purple-800">🐘 ELEPHANT AREA (Tables 30-32)</h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {tables.filter(table => [30,31,32].includes(table.id)).map(table => (
+                    <div key={table.id} className={`border-2 rounded-lg p-4 ${table.status === 'available' ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
+                        <div className="text-center mb-3">
+                            <h3 className="text-lg font-bold">{table.name}</h3>
+                            <p className={`text-xs font-semibold ${table.status === 'available' ? 'text-green-600' : 'text-red-600'}`}>
+                                {table.status === 'available' ? 'Available' : 'Occupied'}
+                            </p>
+                        </div>
+                        {table.status === 'available' ? (
+                            <button onClick={() => openTable(table)} className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-sm font-semibold">
+                                Open
+                            </button>
+                        ) : (
+                            <div>
+                                <div className="text-xs mb-2">
+                                    <p>Waiter: <span className="font-semibold">{table.waiter?.name}</span></p>
+                                    <p>Items: <span className="font-semibold">{table.orders.length}</span></p>
+                                    <p>Total: <span className="font-semibold text-green-600">R{getTotal(table.orders)}</span></p>
+                                </div>
+                                <div className="space-y-1">
+                                    <button onClick={() => addItemsToTable(table)} className="w-full bg-blue-500 hover:bg-blue-600 text-white py-1 rounded text-xs font-semibold">
+                                        Add Items
+                                    </button>
+                                    <button onClick={() => printBill(table)} className="w-full bg-purple-500 hover:bg-purple-600 text-white py-1 rounded text-xs font-semibold">
+                                        Print
+                                    </button>
+                                    <button onClick={() => openPaymentModal(table)} className="w-full bg-green-500 hover:bg-green-600 text-white py-1 rounded text-xs font-semibold">
+                                        Payment
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+
+        {/* LEGEND */}
+        <div className="mt-8 p-4 bg-gray-50 rounded-lg">
+            <h3 className="font-bold mb-3 text-gray-800">📍 Legend</h3>
+            <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="flex items-center">
+                    <div className="w-4 h-4 bg-green-500 rounded mr-2"></div>
+                    <span>Available</span>
+                </div>
+                <div className="flex items-center">
+                    <div className="w-4 h-4 bg-red-500 rounded mr-2"></div>
+                    <span>Occupied</span>
+                </div>
+                <div className="flex items-center">
+                    <div className="flex gap-1 mr-2">
+                        <div className="w-2 h-2 bg-blue-500 rounded"></div>
+                        <div className="w-2 h-2 bg-orange-500 rounded"></div>
+                        <div className="w-2 h-2 bg-purple-500 rounded"></div>
+                    </div>
+                    <span>Main | Monkey | Elephant</span>
+                </div>
+            </div>
+        </div>
+    </div>
+)}
+                            {activeTab === 'menu' && (
+                                <div>
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h2 className="text-2xl font-bold">Menu Management</h2>
+                                        <button onClick={() => setShowAddItem(true)} className="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-bold">
+                                            + Add Item
+                                        </button>
+                                    </div>
+                                    <div className="mb-6 flex gap-2 flex-wrap">
+                                        <button onClick={() => setSelectedCategory('All')} className={`px-4 py-2 rounded-full font-semibold ${selectedCategory === 'All' ? 'bg-green-500 text-white' : 'bg-gray-200'}`}>
+                                            All
+                                        </button>
+                                        {categories.map(cat => (
+                                            <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-4 py-2 rounded-full font-semibold ${selectedCategory === cat ? 'bg-green-500 text-white' : 'bg-gray-200'}`}>
+                                                {cat}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {filteredInventory.map(item => (
+                                            <div key={item.id} className="border-2 rounded-lg p-4 bg-white relative">
+                                                <button 
+                                                    onClick={() => {
+                                                        setNewItem(item);
+                                                        setShowAddItem(true);
+                                                    }}
+                                                    className="absolute top-2 right-2 text-blue-500 hover:text-blue-700 text-xl"
+                                                    title="Edit Item"
+                                                >
+                                                    ✏️
+                                                </button>
+                                                <div className="flex justify-between items-start mb-3">
+                                                    <div>
+                                                        <h3 className="text-lg font-bold">{item.name}</h3>
+                                                        <p className="text-sm text-gray-600">{item.category}</p>
+                                                    </div>
+                                                    <button onClick={() => deleteMenuItem(item.id)} className="text-red-500 hover:text-red-700 font-bold text-xl">
+                                                        🗑️
+                                                    </button>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-gray-600">Price:</span>
+                                                        <span className="text-xl font-bold text-green-600">R{item.price}</span>
+                                                    </div>
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-gray-600">Stock:</span>
+                                                        <input 
+                                                            type="number" 
+                                                            value={item.stock} 
+                                                            onChange={(e) => updateStock(item.id, e.target.value)} 
+                                                            className="w-20 px-2 py-1 border-2 rounded text-center" 
+                                                        />
+                                                    </div>
+                                                    <div className={`text-sm font-semibold text-center py-1 rounded ${item.stock === 0 ? 'bg-red-100 text-red-600' : item.stock < 10 ? 'bg-yellow-100 text-yellow-600' : 'bg-green-100 text-green-600'}`}>
+                                                        {item.stock === 0 ? 'Out of Stock' : item.stock < 10 ? 'Low Stock' : 'In Stock'}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'reports' && (
+                                <div>
+                                    <h2 className="text-2xl font-bold mb-6">Sales Reports</h2>
+                                    
+                                    {/* Date Filter */}
+                                    <div className="bg-blue-50 p-4 rounded-lg mb-6">
+                                        <h3 className="font-bold mb-3">📅 Date Filter</h3>
+                                        <div className="grid grid-cols-2 gap-4 mb-3">
+                                            <div>
+                                                <label className="block text-sm font-semibold mb-1">Start Date</label>
+                                                <input type="date" value={dateFilter.start} onChange={(e) => setDateFilter({...dateFilter, start: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-semibold mb-1">End Date</label>
+                                                <input type="date" value={dateFilter.end} onChange={(e) => setDateFilter({...dateFilter, end: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => setDateFilter({ start: '', end: '' })} className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                                                Clear
+                                            </button>
+                                            <button onClick={printConsolidatedReport} className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                                                🖨️ Print Report
+                                            </button>
+                                            <button onClick={() => exportToCSV(getFilteredSales(), `sales-${new Date().toISOString().split('T')[0]}.csv`)} className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                                                📥 Export CSV
+                                            </button>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Summary Cards */}
+                                    <div className="grid grid-cols-4 gap-4 mb-6">
+                                        <div className="bg-green-50 p-4 rounded-lg">
+                                            <p className="text-gray-600 mb-1 text-sm">Total Sales</p>
+                                            <p className="text-2xl font-bold text-green-600">R{getFilteredSales().reduce((sum, s) => sum + s.total, 0).toFixed(2)}</p>
+                                        </div>
+                                        <div className="bg-blue-50 p-4 rounded-lg">
+                                            <p className="text-gray-600 mb-1 text-sm">Transactions</p>
+                                            <p className="text-2xl font-bold text-blue-600">{getFilteredSales().length}</p>
+                                        </div>
+                                        <div className="bg-purple-50 p-4 rounded-lg">
+                                            <p className="text-gray-600 mb-1 text-sm">Total Tips</p>
+                                            <p className="text-2xl font-bold text-purple-600">R{getFilteredSales().reduce((s, sale) => s + (sale.tip || 0), 0).toFixed(2)}</p>
+                                        </div>
+                                        <div className="bg-orange-50 p-4 rounded-lg">
+                                            <p className="text-gray-600 mb-1 text-sm">Items Sold</p>
+                                            <p className="text-2xl font-bold text-orange-600">{getFilteredSales().reduce((sum, s) => sum + s.items.reduce((iSum, i) => iSum + (i.quantity || 0), 0), 0)}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* NEW: Sales by Waiter Section */}
+                                    <div className="bg-gradient-to-r from-pink-50 to-blue-50 p-6 rounded-lg border-2 border-pink-200 mb-6">
+                                        <h3 className="text-2xl font-bold mb-4 text-pink-800">👥 Sales by Waiter</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                            {getSalesByWaiter().map((waiter, index) => (
+                                                <div key={waiter.id} className="bg-white rounded-lg p-4 shadow-sm border-l-4" 
+                                                     style={{ 
+                                                         borderLeftColor: waiter.color === 'pink' ? '#ec4899' : 
+                                                                        waiter.color === 'blue' ? '#3b82f6' : 
+                                                                        waiter.color === 'purple' ? '#a855f7' : 
+                                                                        '#22c55e' 
+                                                     }}>
+                                                    <div className="flex items-center justify-between mb-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <div className={`w-3 h-3 rounded-full`} 
+                                                                 style={{ 
+                                                                     backgroundColor: waiter.color === 'pink' ? '#ec4899' : 
+                                                                              waiter.color === 'blue' ? '#3b82f6' : 
+                                                                              waiter.color === 'purple' ? '#a855f7' : 
+                                                                              '#22c55e' 
+                                                                 }}></div>
+                                                            <h4 className="font-bold text-lg">{waiter.name}</h4>
+                                                        </div>
+                                                        <span className={`px-2 py-1 rounded-full text-xs font-bold ${index === 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'}`}>
+                                                            #{index + 1}
+                                                        </span>
+                                                    </div>
+                                                    <div className="space-y-3 text-sm">
+                                                        <div className="flex justify-between">
+                                                            <span className="text-gray-600">Sales</span>
+                                                            <span className="font-bold text-green-600">R{waiter.totalSales.toFixed(2)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span className="text-gray-600">Tips</span>
+                                                            <span className="font-bold text-purple-600">R{waiter.totalTips.toFixed(2)}</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span className="text-gray-600">Transactions</span>
+                                                            <span className="font-bold">{waiter.transactions}</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span className="text-gray-600">Items Sold</span>
+                                                            <span className="font-bold">{waiter.itemsSold}</span>
+                                                        </div>
+                                                        <div className="flex justify-between">
+                                                            <span className="text-gray-600">Avg Sale</span>
+                                                            <span className="font-bold text-blue-600">R{waiter.avgSale}</span>
+                                                        </div>
+                                                    </div>
+                                                    {waiter.transactions > 0 && (
+                                                        <div className="mt-4 pt-3 border-t">
+                                                            <div className="flex justify-between text-xs">
+                                                                <span className="text-gray-500">{waiter.transactions} tables</span>
+                                                                <span className="text-gray-500">{Math.round(waiter.itemsSold / waiter.transactions)} items/table</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Rest of Reports - Item Sales & Recent Transactions */}
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                                        <div className="bg-gradient-to-br from-orange-50 to-yellow-50 p-6 rounded-lg border-2 border-orange-200">
+                                            <h3 className="text-xl font-bold mb-4 text-orange-800">📦 Top Selling Items</h3>
+                                            <div className="space-y-3 max-h-96 overflow-y-auto">
+                                                {(() => {
+                                                    const itemSummary = {};
+                                                    getFilteredSales().forEach(sale => {
+                                                        sale.items.forEach(item => {
+                                                            const key = item.name;
+                                                            if (!itemSummary[key]) {
+                                                                itemSummary[key] = {
+                                                                    name: item.name,
+                                                                    category: item.category,
+                                                                    quantity: 0,
+                                                                    revenue: 0
+                                                                };
+                                                            }
+                                                            itemSummary[key].quantity += item.quantity || 0;
+                                                            itemSummary[key].revenue += (item.price * (item.quantity || 0));
+                                                        });
+                                                    });
+                                                    const items = Object.values(itemSummary)
+                                                        .sort((a, b) => b.quantity - a.quantity)
+                                                        .slice(0, 10);
+                                                    
+                                                    return items.length === 0 ? (
+                                                        <p className="text-gray-500 text-center py-8">No items sold in this period</p>
+                                                    ) : (
+                                                        items.map((item, index) => (
+                                                            <div key={item.name} className="bg-white rounded-lg p-3 shadow-sm">
+                                                                <div className="flex justify-between items-start mb-1">
+                                                                    <div>
+                                                                        <p className="font-bold text-gray-800">{item.name}</p>
+                                                                        <p className="text-xs text-gray-500">{item.category}</p>
+                                                                    </div>
+                                                                    <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded-full text-xs font-bold">
+                                                                        x{item.quantity}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex justify-between items-center mt-2">
+                                                                    <span className="text-sm text-gray-600">Revenue:</span>
+                                                                    <span className="text-lg font-bold text-green-600">R{item.revenue.toFixed(2)}</span>
+                                                                </div>
+                                                            </div>
+                                                        ))
+                                                    );
+                                                })()}
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-gradient-to-br from-blue-50 to-purple-50 p-6 rounded-lg border-2 border-blue-200">
+                                            <h3 className="text-xl font-bold mb-4 text-blue-800">💰 Recent Transactions</h3>
+                                            <div className="space-y-3 max-h-96 overflow-y-auto">
+                                                {getFilteredSales().length === 0 ? (
+                                                    <p className="text-gray-500 text-center py-8">No transactions for selected period</p>
+                                                ) : (
+                                                    getFilteredSales().slice(0, 15).map(sale => (
+                                                        <div key={sale.id} className="bg-white rounded-lg p-3 shadow-sm">
+                                                            <div className="flex justify-between items-start mb-2">
+                                                                <div>
+                                                                    <p className="font-bold text-gray-800">{sale.tableName}</p>
+                                                                    <p className="text-xs text-gray-500">{sale.waiter?.name || 'N/A'} | {sale.timestamp}</p>
+                                                                    {sale.description && <p className="text-xs text-gray-400 mt-1">📝 {sale.description}</p>}
+                                                                </div>
+                                                                <div className="text-right">
+                                                                    <p className="text-lg font-bold text-green-600">R{sale.total.toFixed(2)}</p>
+                                                                    {sale.tip > 0 && <p className="text-xs text-purple-600">+R{sale.tip.toFixed(2)} tip</p>}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-2 text-xs text-gray-600">
+                                                                <span className="bg-gray-100 px-2 py-1 rounded">{sale.items.length} items</span>
+                                                                <span className={`px-2 py-1 rounded ${sale.paymentMethod === 'Cash' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
+                                                                    {sale.paymentMethod}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Payment Methods */}
+                                    <div className="bg-gradient-to-r from-green-50 to-blue-50 p-6 rounded-lg border-2 border-green-200">
+                                        <h3 className="text-xl font-bold mb-4">💳 Payment Methods</h3>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="bg-white rounded-lg p-4 shadow-sm">
+                                                <p className="text-sm text-gray-600 mb-1">Cash Sales</p>
+                                                <p className="text-2xl font-bold text-green-600">
+                                                    R{getFilteredSales().filter(s => s.paymentMethod === 'Cash').reduce((sum, s) => sum + s.total, 0).toFixed(2)}
+                                                </p>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    {getFilteredSales().filter(s => s.paymentMethod === 'Cash').length} transactions
+                                                </p>
+                                            </div>
+                                            <div className="bg-white rounded-lg p-4 shadow-sm">
+                                                <p className="text-sm text-gray-600 mb-1">Card Sales</p>
+                                                <p className="text-2xl font-bold text-blue-600">
+                                                    R{getFilteredSales().filter(s => s.paymentMethod === 'Card').reduce((sum, s) => sum + s.total, 0).toFixed(2)}
+                                                </p>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    {getFilteredSales().filter(s => s.paymentMethod === 'Card').length} transactions
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'cashup' && (
+                                <div>
+                                    <h2 className="text-2xl font-bold mb-6">Daily Cash Up</h2>
+                                    <div className="bg-gradient-to-r from-green-500 to-blue-500 text-white p-6 rounded-lg mb-6">
+                                        <h3 className="text-xl font-bold mb-2">Today's Summary</h3>
+                                        <p className="text-3xl font-bold">Total: R{getTodaySales().toFixed(2)}</p>
+                                        <p className="text-lg">Tips: R{sales.reduce((sum, s) => sum + (s.tip || 0), 0).toFixed(2)}</p>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-6 mb-6">
+                                        <div className="bg-green-50 p-6 rounded-lg">
+                                            <p className="text-gray-600 mb-2">Cash</p>
+                                            <p className="text-2xl font-bold text-green-600">R{sales.filter(s => s.paymentMethod === 'Cash').reduce((sum, s) => sum + s.total, 0).toFixed(2)}</p>
+                                        </div>
+                                        <div className="bg-blue-50 p-6 rounded-lg">
+                                            <p className="text-gray-600 mb-2">Card</p>
+                                            <p className="text-2xl font-bold text-blue-600">R{sales.filter(s => s.paymentMethod === 'Card').reduce((sum, s) => sum + s.total, 0).toFixed(2)}</p>
+                                        </div>
+                                        <div className="bg-purple-50 p-6 rounded-lg">
+                                            <p className="text-gray-600 mb-2">Transactions</p>
+                                            <p className="text-2xl font-bold text-purple-600">{sales.length}</p>
+                                        </div>
+                                    </div>
+                                    <div className="bg-yellow-50 border-2 border-yellow-400 p-4 rounded-lg mb-6">
+                                        <h3 className="font-bold text-yellow-800 mb-2">⚠️ Warning</h3>
+                                        <p className="text-yellow-800">Finalizing the day will print report and reset daily sales. Historical data preserved.</p>
+                                    </div>
+                                    <button onClick={finalizeDayCashUp} className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-lg text-lg">
+                                        Finalize Day & Reset
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                .then(reg => console.log('Service Worker registered'))
+                .catch(err => console.log('Service Worker registration failed:', err));
+            });
+        }
+        ReactDOM.render(<LittleJunglePOS />, document.getElementById('root'));
+    </script>
+</body>
+</html>
