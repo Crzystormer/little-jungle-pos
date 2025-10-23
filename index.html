@@ -81,6 +81,12 @@
             const [tipAmount, setTipAmount] = useState('0');
             const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
             const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
+	useEffect(() => {
+    if (activeTab === 'reports') {
+        const today = new Date().toISOString().split('T')[0];
+        setDateFilter({ start: today, end: today });
+    }
+}, [activeTab]);
             const [tableDescription, setTableDescription] = useState('');
             const [showDescriptionModal, setShowDescriptionModal] = useState(false);
             const [pendingTable, setPendingTable] = useState(null);
@@ -596,15 +602,26 @@
             };
 
             const finalizeDayCashUp = () => {
-                if (window.confirm('Finalize day? This will print consolidated report and reset daily data.')) {
-                    printConsolidatedReport();
-                    setTimeout(() => {
-                        setSales([]);
-                        setWaiters(waiters.map(w => ({ ...w, sales: [] })));
-                        alert('Day finalized! Report printed. Historical data preserved.');
-                    }, 1000);
-                }
-            };
+    // CHECK IF ALL TABLES ARE CLOSED
+    const openTables = tables.filter(t => t.status === 'occupied');
+    
+    if (openTables.length > 0) {
+        // SHOW WARNING WITH OPEN TABLE NAMES
+        const tableNames = openTables.map(t => t.name).join(', ');
+        alert(`⚠️ CANNOT FINALIZE!\n\n${openTables.length} table(s) still OPEN:\n• ${tableNames}\n\nPlease close all tables first.`);
+        return;
+    }
+    
+    // ALL TABLES CLOSED - PROCEED WITH FINALIZE
+    if (window.confirm('Finalize day? This will print consolidated report and reset daily data.')) {
+        printConsolidatedReport();
+        setTimeout(() => {
+            setSales([]);
+            setWaiters(waiters.map(w => ({ ...w, sales: [] })));
+            alert('✅ Day finalized! Report printed. Historical data preserved.');
+        }, 1000);
+    }
+};
 
             const filteredInventory = selectedCategory === 'All' 
                 ? inventory 
@@ -693,41 +710,169 @@ Thank you for visiting!
             };
 
             const printConsolidatedReport = async () => {
-                const filteredSales = getFilteredSales();
-                const totalSales = filteredSales.reduce((sum, s) => sum + s.total, 0);
-                const totalTips = filteredSales.reduce((sum, s) => sum + (s.tip || 0), 0);
-                const cashSales = filteredSales.filter(s => s.paymentMethod === 'Cash').reduce((sum, s) => sum + s.total, 0);
-                const cardSales = filteredSales.filter(s => s.paymentMethod === 'Card').reduce((sum, s) => sum + s.total, 0);
-                
-                const reportWindow = window.open('', '_blank');
-                reportWindow.document.write(`
-                    <!DOCTYPE html><html><head><title>Report</title><style>
-                    body{font-family:monospace;padding:10px;max-width:300px;margin:0 auto;font-size:12px}
-                    .row{display:flex;justify-content:space-between;margin:3px 0}
-                    </style></head><body>
-                    <h2 style="text-align:center">LITTLE JUNGLE PLAYGROUND</h2>
-                    <p style="text-align:center">DAILY REPORT</p>
-                    <p style="text-align:center">${new Date().toLocaleString()}</p>
-                    <hr>
-                    <div class="row"><strong>TOTAL SALES:</strong><strong>R${totalSales.toFixed(2)}</strong></div>
-                    <div class="row"><span>Tips:</span><span>R${totalTips.toFixed(2)}</span></div>
-                    <div class="row"><span>Cash:</span><span>R${cashSales.toFixed(2)}</span></div>
-                    <div class="row"><span>Card:</span><span>R${cardSales.toFixed(2)}</span></div>
-                    <div class="row"><span>Transactions:</span><span>${filteredSales.length}</span></div>
-                    <hr>
-                    ${filteredSales.map(sale => `
-                        <p><strong>${sale.tableName} - ${sale.waiter?.name || 'N/A'}</strong></p>
-                        <p>${sale.timestamp}</p>
-                        <p>R${sale.total.toFixed(2)} (${sale.paymentMethod})</p>
-                        <hr>
-                    `).join('')}
-                    <p style="text-align:center">Little Jungle Playground</p>
-                    <button onclick="window.close()" style="display:block;margin:20px auto;padding:10px 20px;background:#007bff;color:white;border:none;border-radius:5px;cursor:pointer;">Close</button>
-                    </body></html>
-                `);
-                reportWindow.document.close();
-                setTimeout(() => reportWindow.print(), 250);
-            };
+    const filteredSales = getFilteredSales();
+    const totalSales = filteredSales.reduce((sum, s) => sum + s.total, 0);
+    const totalTips = filteredSales.reduce((sum, s) => sum + (s.tip || 0), 0);
+    const cashSales = filteredSales.filter(s => s.paymentMethod === 'Cash').reduce((sum, s) => sum + s.total, 0);
+    const cardSales = filteredSales.filter(s => s.paymentMethod === 'Card').reduce((sum, s) => sum + s.total, 0);
+    
+    // DATE RANGE DISPLAY
+    let dateRangeText = '';
+    if (dateFilter.start && dateFilter.end) {
+        dateRangeText = `FROM ${new Date(dateFilter.start).toLocaleDateString()} TO ${new Date(dateFilter.end).toLocaleDateString()}`;
+    } else if (dateFilter.start) {
+        dateRangeText = `FROM ${new Date(dateFilter.start).toLocaleDateString()}`;
+    } else if (dateFilter.end) {
+        dateRangeText = `TO ${new Date(dateFilter.end).toLocaleDateString()}`;
+    } else {
+        dateRangeText = `TODAY - ${new Date().toLocaleDateString()}`;
+    }
+    
+    // CONSOLIDATE BY WAITER
+    const waiterSummary = waiters.map(waiter => {
+        const waiterSales = filteredSales.filter(sale => 
+            sale.waiter && sale.waiter.id === waiter.id
+        );
+        const waiterTotal = waiterSales.reduce((sum, s) => sum + s.total, 0);
+        const waiterTips = waiterSales.reduce((sum, s) => sum + (s.tip || 0), 0);
+        const waiterCash = waiterSales.filter(s => s.paymentMethod === 'Cash').reduce((sum, s) => sum + s.total, 0);
+        const waiterCard = waiterSales.filter(s => s.paymentMethod === 'Card').reduce((sum, s) => sum + s.total, 0);
+        const transactions = waiterSales.length;
+        
+        return {
+            ...waiter,
+            total: waiterTotal,
+            tips: waiterTips,
+            cash: waiterCash,
+            card: waiterCard,
+            transactions
+        };
+    }).filter(w => w.transactions > 0)
+     .sort((a, b) => b.total - a.total);
+
+    const reportWindow = window.open('', '_blank');
+    reportWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Daily Report - By Waiter</title>
+            <style>
+                body {
+                    font-family: 'Courier New', monospace;
+                    padding: 10px;
+                    max-width: 400px;
+                    margin: 0 auto;
+                    font-size: 11px;
+                    line-height: 1.3;
+                }
+                .header { text-align: center; margin-bottom: 15px; }
+                .header h1 { font-size: 16px; margin: 0; }
+                .header p { margin: 2px 0; font-size: 10px; }
+                .date-range { 
+                    font-weight: bold; 
+                    font-size: 11px; 
+                    margin: 5px 0; 
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                hr { border: none; border-top: 1px dashed #000; margin: 8px 0; }
+                .summary { margin-bottom: 20px; }
+                .summary .row { display: flex; justify-content: space-between; margin: 3px 0; }
+                .summary .total { font-weight: bold; font-size: 12px; }
+                .waiter-section { margin-bottom: 15px; page-break-inside: avoid; }
+                .waiter-header {
+                    background: #f0f0f0;
+                    padding: 4px 0;
+                    font-weight: bold;
+                    border-bottom: 2px solid #000;
+                    margin-bottom: 5px;
+                }
+                .waiter-name { font-size: 12px; }
+                .waiter-stats { font-size: 10px; }
+                .waiter-tables { font-size: 9px; margin-top: 3px; }
+                .waiter-tables .table-row { display: flex; justify-content: space-between; margin: 1px 0; }
+                .grand-total { 
+                    border-top: 2px solid #000; 
+                    padding-top: 5px; 
+                    margin-top: 10px;
+                    font-weight: bold;
+                    font-size: 12px;
+                }
+                .close-btn {
+                    display: block;
+                    margin: 20px auto;
+                    padding: 8px 16px;
+                    background: #007bff;
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    cursor: pointer;
+                    font-size: 11px;
+                }
+                @media print {
+                    .close-btn { display: none; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>LITTLE JUNGLE PLAYGROUND</h1>
+                <p>DAILY CONSOLIDATED REPORT</p>
+                <p class="date-range">${dateRangeText}</p>
+                <p>${new Date().toLocaleString()}</p>
+            </div>
+
+            <hr>
+
+            <div class="summary">
+                <div class="row"><span>GRAND TOTAL:</span><span>R${totalSales.toFixed(2)}</span></div>
+                <div class="row"><span>TOTAL TIPS:</span><span>R${totalTips.toFixed(2)}</span></div>
+                <div class="row"><span>CASH SALES:</span><span>R${cashSales.toFixed(2)}</span></div>
+                <div class="row"><span>CARD SALES:</span><span>R${cardSales.toFixed(2)}</span></div>
+                <div class="row total"><span>TOTAL TRANSACTIONS:</span><span>${filteredSales.length}</span></div>
+            </div>
+
+            <hr>
+
+            ${waiterSummary.map((waiter, index) => `
+                <div class="waiter-section">
+                    <div class="waiter-header">
+                        <div class="waiter-name">#${index + 1} ${waiter.name}</div>
+                        <div class="waiter-stats">
+                            <span>R${waiter.total.toFixed(2)}</span> 
+                            | <span>${waiter.transactions} tables</span>
+                        </div>
+                    </div>
+                    
+                    <div class="row"><span>Cash:</span><span>R${waiter.cash.toFixed(2)}</span></div>
+                    <div class="row"><span>Card:</span><span>R${waiter.card.toFixed(2)}</span></div>
+                    <div class="row"><span>Tips:</span><span>R${waiter.tips.toFixed(2)}</span></div>
+                    
+                    <div class="waiter-tables">
+                        ${filteredSales.filter(sale => sale.waiter?.id === waiter.id)
+                            .map(sale => `
+                                <div class="table-row">
+                                    <span>${sale.tableName}</span>
+                                    <span>R${sale.total.toFixed(2)}</span>
+                                </div>
+                            `).join('')}
+                    </div>
+                </div>
+                <hr>
+            `).join('')}
+
+            <div class="grand-total">
+                <div class="row"><span>GRAND TOTAL:</span><span>R${totalSales.toFixed(2)}</span></div>
+                <div class="row"><span>TOTAL TIPS:</span><span>R${totalTips.toFixed(2)}</span></div>
+            </div>
+
+            <button class="close-btn" onclick="window.close()">Close</button>
+        </body>
+        </html>
+    `);
+    reportWindow.document.close();
+    setTimeout(() => reportWindow.print(), 250);
+};
 
             const exportToCSV = (data, filename) => {
                 const csvRows = [];
