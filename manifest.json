@@ -2,7 +2,7 @@
   "name": "Little Jungle POS",
   "short_name": "Jungle POS",
   "description": "Point of Sale System for Little Jungle Playground",
-  "start_url": "./Grok1.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#22c55e",
@@ -31,5 +31,10 @@
       "type": "image/png"
     }
   ],
-  "scope": "/"
+  "scope": "/",
+  "display_override": [
+    "fullscreen",
+    "window-controls-overlay"
+  ],
+  "orientation": "any"
 }
