@@ -901,6 +901,17 @@ Thank you for visiting!
                 window.URL.revokeObjectURL(url);
             };
 
+            const clearSales = () => {
+                if (window.confirm('Are you sure you want to clear all sales data? This cannot be undone.')) {
+                    setSales([]);
+                    setHistoricalSales([]);
+                    setWaiters(waiters.map(w => ({ ...w, sales: [] })));
+                    localStorage.removeItem('sales');
+                    localStorage.removeItem('historicalSales');
+                    alert('All sales data cleared!');
+                }
+            };
+
             return (
                 <div className="min-h-screen bg-gradient-to-br from-green-400 via-yellow-300 to-orange-400 p-4">
                     <div className="max-w-7xl mx-auto">
@@ -1016,6 +1027,13 @@ Thank you for visiting!
                                                 </button>
                                                 <input ref={fileInputRef} type="file" accept=".json" onChange={importData} style={{ display: 'none' }} />
                                             </div>
+                                        </div>
+                                        <div className="border-2 border-gray-200 rounded-lg p-4">
+                                            <h3 className="text-lg font-bold mb-3">🗑️ Clear Sales</h3>
+                                            <p className="text-sm text-gray-600 mb-4">Permanently delete all sales records.</p>
+                                            <button onClick={clearSales} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold">
+                                                Clear All Sales
+                                            </button>
                                         </div>
                                         <div className="border-2 border-gray-200 rounded-lg p-4">
                                             <h3 className="text-lg font-bold mb-3">📊 Data Info</h3>
