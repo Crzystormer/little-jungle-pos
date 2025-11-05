@@ -90,7 +90,6 @@
             const [tableDescription, setTableDescription] = useState('');
             const [showDescriptionModal, setShowDescriptionModal] = useState(false);
             const [pendingTable, setPendingTable] = useState(null);
-            const [bluetoothDevice, setBluetoothDevice] = useState(null);
             const [showSettings, setShowSettings] = useState(false);
             const [showAddItem, setShowAddItem] = useState(false);
             const [newItem, setNewItem] = useState({ name: '', category: 'Drinks', price: '', stock: '' });
@@ -371,35 +370,28 @@
                 ));
             };
 
-            const connectBluetoothPrinter = async () => {
-                try {
-                    const device = await navigator.bluetooth.requestDevice({
-                        filters: [{ services: ['000018f0-0000-1000-8000-00805f9b34fb'] }],
-                        optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
-                    });
-                    setBluetoothDevice(device);
-                    alert('Bluetooth printer connected!');
-                    saveToStorage('bluetoothDeviceId', device.id);
-                } catch (error) {
-                    console.error('Bluetooth connection failed:', error);
-                    alert('Failed to connect to printer. Make sure Bluetooth is enabled.');
-                }
-            };
+            // === NETWORK PRINTER (192.168.0.162:9100) ===
+            const PRINTER_IP = '192.168.0.162';
+            const PRINTER_PORT = 9100;
 
-            const printViaBluetooth = async (content) => {
-                if (!bluetoothDevice) {
-                    return false;
-                }
+            const printViaNetwork = async (content) => {
                 try {
-                    const server = await bluetoothDevice.gatt.connect();
-                    const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
-                    const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+                    const socket = new TCPSocket(PRINTER_IP, PRINTER_PORT);
+                    await socket.opened;
+
+                    const writer = socket.writable.getWriter();
                     const encoder = new TextEncoder();
-                    const data = encoder.encode(content);
-                    await characteristic.writeValue(data);
+                    const data = encoder.encode(content + '\n\n\n'); // Add line feeds for cut
+
+                    await writer.write(data);
+                    await writer.close();
+                    await socket.close();
+
+                    console.log('Printed via network printer');
                     return true;
                 } catch (error) {
-                    console.error('Bluetooth print failed:', error);
+                    console.error('Network print failed:', error);
+                    alert('Failed to print. Check printer IP, network, and browser permissions.');
                     return false;
                 }
             };
@@ -601,6 +593,77 @@
                 setSelectedTable(null);
             };
 
+            const finalizeSplitPayment = (payerIndex) => {
+                const payer = payers[payerIndex];
+                if (!payer.paymentMethod) {
+                    alert('Please select payment method for this payer!');
+                    return;
+                }
+                const billTotal = getTotal(payer.items);
+                const tip = parseFloat(payer.tip) || 0;
+                const total = billTotal + tip;
+                const received = parseFloat(payer.amountReceived) || 0;
+                if (payer.paymentMethod === 'Cash' && received < total) {
+                    alert(`Insufficient for payer ${payerIndex + 1}! Need R${total.toFixed(2)}`);
+                    return;
+                }
+                const change = payer.paymentMethod === 'Cash' ? received - total : 0;
+                const sale = {
+                    id: Date.now(),
+                    tableName: `${selectedTable.name} (Split ${payerIndex + 1})`,
+                    waiter: selectedTable.waiter,
+                    items: [...payer.items],
+                    subtotal: billTotal,
+                    tip: tip,
+                    total: total,
+                    paymentMethod: payer.paymentMethod,
+                    timestamp: new Date().toLocaleString(),
+                    date: new Date().toISOString().split('T')[0],
+                    description: selectedTable.description
+                };
+                setSales([sale, ...sales]);
+                setHistoricalSales([sale, ...historicalSales]);
+                setWaiters(waiters.map(w => 
+                    w.id === selectedTable.waiter.id 
+                        ? { ...w, sales: [...w.sales, sale] } 
+                        : w
+                ));
+                setInventory(inventory.map(item => {
+                    const orderItem = payer.items.find(o => o.id === item.id);
+                    if (orderItem) {
+                        return { ...item, stock: item.stock - orderItem.quantity };
+                    }
+                    return item;
+                }));
+                // Mark payer as paid
+                const updatedPayers = [...payers];
+                updatedPayers[payerIndex] = { ...payer, paid: true };
+                setPayers(updatedPayers);
+
+                // Print split bill
+                printSplitBill(sale, payerIndex + 1);
+
+                if (change > 0) {
+                    alert(`Payment for payer ${payerIndex + 1} completed!\nChange: R${change.toFixed(2)}`);
+                } else {
+                    alert(`Payment for payer ${payerIndex + 1} completed!`);
+                }
+
+                // Check if all payers paid and no unassigned items
+                if (updatedPayers.every(p => p.paid) && unassignedItems.length === 0) {
+                    setTables(tables.map(t => 
+                        t.id === selectedTable.id 
+                            ? { ...t, status: 'available', orders: [], waiter: null, description: '' }
+                            : t
+                    ));
+                    setShowPaymentModal(false);
+                    setSelectedTable(null);
+                    setIsSplitting(false);
+                    setPayers([]);
+                    setUnassignedItems([]);
+                }
+            };
+
             const finalizeDayCashUp = () => {
     // CHECK IF ALL TABLES ARE CLOSED
     const openTables = tables.filter(t => t.status === 'occupied');
@@ -681,8 +744,9 @@ TOTAL: R${getTotal(table.orders).toFixed(2)}
 ----------------------------
 Thank you for visiting!
                 `;
-                const bluetoothSuccess = await printViaBluetooth(textContent);
-                if (!bluetoothSuccess) {
+
+                const success = await printViaNetwork(textContent);
+                if (!success) {
                     const billWindow = window.open('', '_blank');
                     billWindow.document.write(`
                         <!DOCTYPE html>
@@ -700,6 +764,114 @@ Thank you for visiting!
                         ${table.orders.map(item => `<div class="item"><span>${item.quantity}x ${item.name}</span><span>R${(item.price * item.quantity).toFixed(2)}</span></div>`).join('')}
                         <hr>
                         <div class="item"><strong>TOTAL:</strong><strong>R${getTotal(table.orders).toFixed(2)}</strong></div>
+                        <p style="text-align:center;margin-top:20px">Thank you!</p>
+                        <button onclick="window.close()" style="display:block;margin:20px auto;padding:10px 20px;background:#007bff;color:white;border:none;border-radius:5px;cursor:pointer;">Close</button>
+                        </body></html>
+                    `);
+                    billWindow.document.close();
+                    setTimeout(() => billWindow.print(), 250);
+                }
+            };
+
+            const printSplitBill = async (sale, splitNumber) => {
+                const textContent = `
+Little Jungle Playground
+${new Date().toLocaleString()}
+----------------------------
+${sale.tableName}
+Waiter: ${sale.waiter?.name || 'N/A'}
+${sale.description ? `Note: ${sale.description}\n` : ''}----------------------------
+${sale.items.map(item => `${item.quantity}x ${item.name.padEnd(15)} R${(item.price * item.quantity).toFixed(2)}`).join('\n')}
+----------------------------
+SUBTOTAL: R${sale.subtotal.toFixed(2)}
+TIP: R${sale.tip.toFixed(2)}
+TOTAL: R${sale.total.toFixed(2)}
+----------------------------
+Thank you for visiting!
+                `;
+
+                const success = await printViaNetwork(textContent);
+                if (!success) {
+                    const billWindow = window.open('', '_blank');
+                    billWindow.document.write(`
+                        <!DOCTYPE html>
+                        <html><head><title>Split Bill ${splitNumber}</title><style>
+                            body{font-family:monospace;padding:20px;max-width:300px;margin:0 auto}
+                            h1{text-align:center;font-size:18px}
+                            .item{display:flex;justify-content:space-between;margin:5px 0}
+                        </style></head><body>
+                        <h1>Little Jungle Playground</h1>
+                        <p>${new Date().toLocaleString()}</p>
+                        <p><strong>${sale.tableName}</strong></p>
+                        <p>Waiter: ${sale.waiter?.name || 'N/A'}</p>
+                        ${sale.description ? `<p>Note: ${sale.description}</p>` : ''}
+                        <hr>
+                        ${sale.items.map(item => `<div class="item"><span>${item.quantity}x ${item.name}</span><span>R${(item.price * item.quantity).toFixed(2)}</span></div>`).join('')}
+                        <hr>
+                        <div class="item"><strong>SUBTOTAL:</strong><strong>R${sale.subtotal.toFixed(2)}</strong></div>
+                        <div class="item"><strong>TIP:</strong><strong>R${sale.tip.toFixed(2)}</strong></div>
+                        <div class="item"><strong>TOTAL:</strong><strong>R${sale.total.toFixed(2)}</strong></div>
+                        <p style="text-align:center;margin-top:20px">Thank you!</p>
+                        <button onclick="window.close()" style="display:block;margin:20px auto;padding:10px 20px;background:#007bff;color:white;border:none;border-radius:5px;cursor:pointer;">Close</button>
+                        </body></html>
+                    `);
+                    billWindow.document.close();
+                    setTimeout(() => billWindow.print(), 250);
+                }
+            };
+
+            const printPayerBill = async (payer, splitNumber) => {
+                const tempSale = {
+                    tableName: `${selectedTable.name} (Split ${splitNumber})`,
+                    waiter: selectedTable.waiter,
+                    items: [...payer.items],
+                    subtotal: getTotal(payer.items),
+                    tip: parseFloat(payer.tip || 0),
+                    total: getTotal(payer.items) + parseFloat(payer.tip || 0),
+                    paymentMethod: payer.paymentMethod || 'Pending',
+                    timestamp: new Date().toLocaleString(),
+                    date: new Date().toISOString().split('T')[0],
+                    description: selectedTable.description
+                };
+                const textContent = `
+Little Jungle Playground
+${new Date().toLocaleString()}
+----------------------------
+${tempSale.tableName}
+Waiter: ${tempSale.waiter?.name || 'N/A'}
+${tempSale.description ? `Note: ${tempSale.description}\n` : ''}----------------------------
+${tempSale.items.map(item => `${item.quantity}x ${item.name.padEnd(15)} R${(item.price * item.quantity).toFixed(2)}`).join('\n')}
+----------------------------
+SUBTOTAL: R${tempSale.subtotal.toFixed(2)}
+TIP: R${tempSale.tip.toFixed(2)}
+TOTAL: R${tempSale.total.toFixed(2)}
+----------------------------
+Payment: ${tempSale.paymentMethod}
+Thank you for visiting!
+                `;
+
+                const success = await printViaNetwork(textContent);
+                if (!success) {
+                    const billWindow = window.open('', '_blank');
+                    billWindow.document.write(`
+                        <!DOCTYPE html>
+                        <html><head><title>Split Bill ${splitNumber}</title><style>
+                            body{font-family:monospace;padding:20px;max-width:300px;margin:0 auto}
+                            h1{text-align:center;font-size:18px}
+                            .item{display:flex;justify-content:space-between;margin:5px 0}
+                        </style></head><body>
+                        <h1>Little Jungle Playground</h1>
+                        <p>${new Date().toLocaleString()}</p>
+                        <p><strong>${tempSale.tableName}</strong></p>
+                        <p>Waiter: ${tempSale.waiter?.name || 'N/A'}</p>
+                        ${tempSale.description ? `<p>Note: ${tempSale.description}</p>` : ''}
+                        <hr>
+                        ${tempSale.items.map(item => `<div class="item"><span>${item.quantity}x ${item.name}</span><span>R${(item.price * item.quantity).toFixed(2)}</span></div>`).join('')}
+                        <hr>
+                        <div class="item"><strong>SUBTOTAL:</strong><strong>R${tempSale.subtotal.toFixed(2)}</strong></div>
+                        <div class="item"><strong>TIP:</strong><strong>R${tempSale.tip.toFixed(2)}</strong></div>
+                        <div class="item"><strong>TOTAL:</strong><strong>R${tempSale.total.toFixed(2)}</strong></div>
+                        <div class="item"><strong>Payment:</strong><strong>${tempSale.paymentMethod}</strong></div>
                         <p style="text-align:center;margin-top:20px">Thank you!</p>
                         <button onclick="window.close()" style="display:block;margin:20px auto;padding:10px 20px;background:#007bff;color:white;border:none;border-radius:5px;cursor:pointer;">Close</button>
                         </body></html>
@@ -912,6 +1084,78 @@ Thank you for visiting!
                 }
             };
 
+            // Bill splitting states
+            const [isSplitting, setIsSplitting] = useState(false);
+            const [payers, setPayers] = useState([]);
+            const [unassignedItems, setUnassignedItems] = useState([]);
+
+            const startSplitting = () => {
+                setIsSplitting(true);
+                setUnassignedItems([...selectedTable.orders]);
+                setPayers([
+                    { id: 1, items: [], tip: '0', paymentMethod: null, amountReceived: '', paid: false },
+                    { id: 2, items: [], tip: '0', paymentMethod: null, amountReceived: '', paid: false }
+                ]);
+            };
+
+            const addPayer = () => {
+                if (payers.length >= 5) return;
+                const newId = payers.length + 1;
+                setPayers([...payers, { id: newId, items: [], tip: '0', paymentMethod: null, amountReceived: '', paid: false }]);
+            };
+
+            const assignItemToPayer = (itemIndex, payerId) => {
+                const item = unassignedItems[itemIndex];
+                const updatedUnassigned = unassignedItems.filter((_, idx) => idx !== itemIndex);
+                setUnassignedItems(updatedUnassigned);
+                setPayers(payers.map(p => 
+                    p.id === payerId ? { ...p, items: [...p.items, item] } : p
+                ));
+            };
+
+            const removeItemFromPayer = (payerId, itemIndex) => {
+                const payer = payers.find(p => p.id === payerId);
+                const item = payer.items[itemIndex];
+                const updatedItems = payer.items.filter((_, idx) => idx !== itemIndex);
+                setPayers(payers.map(p => 
+                    p.id === payerId ? { ...p, items: updatedItems } : p
+                ));
+                setUnassignedItems([...unassignedItems, item]);
+            };
+
+            const updatePayerTip = (payerId, value) => {
+                setPayers(payers.map(p => 
+                    p.id === payerId ? { ...p, tip: value } : p
+                ));
+            };
+
+            const updatePayerAmountReceived = (payerId, value) => {
+                setPayers(payers.map(p => 
+                    p.id === payerId ? { ...p, amountReceived: value } : p
+                ));
+            };
+
+            const setPayerPaymentMethod = (payerId, method) => {
+                setPayers(payers.map(p => 
+                    p.id === payerId ? { ...p, paymentMethod: method } : p
+                ));
+            };
+
+            const cancelSplitting = () => {
+                setIsSplitting(false);
+                setPayers([]);
+                setUnassignedItems([]);
+            };
+
+            const clearBill = (table) => {
+                if (window.confirm('Clear entire bill for this table? This cannot be undone.')) {
+                    setTables(tables.map(t => 
+                        t.id === table.id ? { ...t, orders: [], status: 'available', waiter: null, description: '' } : t
+                    ));
+                    alert('Bill cleared! Table reset to available.');
+                }
+            };
+
             return (
                 <div className="min-h-screen bg-gradient-to-br from-green-400 via-yellow-300 to-orange-400 p-4">
                     <div className="max-w-7xl mx-auto">
@@ -935,9 +1179,7 @@ Thank you for visiting!
                                         {isFullScreen ? '📴 Exit Full Screen' : '📺 Full Screen'}
                                     </button>
                                     <div className="text-right">
-                                        <p className="text-sm text-gray-500">Today's Sales</p>
-                                        <p className="text-2xl font-bold text-green-600">R{getTodaySales().toFixed(2)}</p>
-                                        {firebaseEnabled && <p className="text-xs text-blue-600">☁️ Cloud Enabled</p>}
+                                                                                {firebaseEnabled && <p className="text-xs text-blue-600">☁️ Cloud Enabled</p>}
                                     </div>
                                 </div>
                             </div>
@@ -999,10 +1241,17 @@ Thank you for visiting!
                                     <h2 className="text-2xl font-bold mb-6">Settings</h2>
                                     <div className="space-y-6">
                                         <div className="border-2 border-gray-200 rounded-lg p-4">
-                                            <h3 className="text-lg font-bold mb-3">🖨️ Bluetooth Printer</h3>
-                                            <p className="text-sm text-gray-600 mb-4">Connect a bluetooth thermal printer for receipt printing.</p>
-                                            <button onClick={connectBluetoothPrinter} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold">
-                                                {bluetoothDevice ? '✓ Connected' : 'Connect Printer'}
+                                            <h3 className="text-lg font-bold mb-3">🖨️ Network Printer</h3>
+                                            <p className="text-sm text-gray-600 mb-4">Sending receipts to <strong>{PRINTER_IP}:{PRINTER_PORT}</strong>.</p>
+                                            <button 
+                                                onClick={async () => {
+                                                    const test = `TEST PRINT\n${new Date().toLocaleString()}\nLittle Jungle POS\nReady!\n\n\n`;
+                                                    const ok = await printViaNetwork(test);
+                                                    alert(ok ? 'Test print sent!' : 'Print failed');
+                                                }} 
+                                                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold"
+                                            >
+                                                Test Print
                                             </button>
                                         </div>
                                         <div className="border-2 border-gray-200 rounded-lg p-4">
@@ -1029,97 +1278,40 @@ Thank you for visiting!
                                             </div>
                                         </div>
                                         <div className="border-2 border-gray-200 rounded-lg p-4">
-                                            <h3 className="text-lg font-bold mb-3">🗑️ Clear Sales</h3>
-                                            <p className="text-sm text-gray-600 mb-4">Permanently delete all sales records.</p>
+                                            <h3 className="text-lg font-bold mb-3">🗑️ Clear Sales Data</h3>
                                             <button onClick={clearSales} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold">
                                                 Clear All Sales
                                             </button>
                                         </div>
-                                        <div className="border-2 border-gray-200 rounded-lg p-4">
-                                            <h3 className="text-lg font-bold mb-3">📊 Data Info</h3>
-                                            <div className="space-y-2 text-sm">
-                                                <div className="flex justify-between"><span>Historical Sales:</span><span className="font-bold">{historicalSales.length}</span></div>
-                                                <div className="flex justify-between"><span>Today's Sales:</span><span className="font-bold">{sales.length}</span></div>
-                                                <div className="flex justify-between"><span>Menu Items:</span><span className="font-bold">{inventory.length}</span></div>
-                                                <div className="flex justify-between"><span>Tables:</span><span className="font-bold">{tables.length}</span></div>
-                                            </div>
-                                        </div>
                                     </div>
-                                    <button onClick={() => setShowSettings(false)} className="mt-6 w-full bg-gray-300 hover:bg-gray-400 py-3 rounded-lg font-semibold">
+                                    <button onClick={() => setShowSettings(false)} className="mt-6 w-full bg-gray-300 py-2 rounded-lg">
                                         Close
                                     </button>
                                 </div>
                             </div>
                         )}
 
-                        {/* Add/Edit Item Modal */}
+                        {/* Add/Edit Menu Item Modal */}
                         {showAddItem && (
                             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                                 <div className="bg-white rounded-2xl p-8 max-w-md w-full">
-                                    <h2 className="text-2xl font-bold mb-6">
-                                        {newItem.id ? 'Edit Menu Item' : 'Add Menu Item'}
-                                    </h2>
+                                    <h2 className="text-2xl font-bold mb-6">{newItem.id ? 'Edit' : 'Add'} Menu Item</h2>
                                     <div className="space-y-4">
-                                        <div>
-                                            <label className="block font-semibold mb-2">Item Name</label>
-                                            <input 
-                                                type="text" 
-                                                value={newItem.name} 
-                                                onChange={(e) => setNewItem({...newItem, name: e.target.value})}
-                                                className="w-full px-4 py-3 border-2 rounded-lg" 
-                                                placeholder="e.g., Milkshake" 
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block font-semibold mb-2">Category</label>
-                                            <select 
-                                                value={newItem.category} 
-                                                onChange={(e) => setNewItem({...newItem, category: e.target.value})}
-                                                className="w-full px-4 py-3 border-2 rounded-lg"
-                                            >
-                                                <option value="Drinks">Drinks</option>
-                                                <option value="Snacks">Snacks</option>
-                                                <option value="Food">Food</option>
-                                                <option value="Packages">Packages</option>
-                                                <option value="Other">Other</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block font-semibold mb-2">Price (R)</label>
-                                            <input 
-                                                type="number" 
-                                                value={newItem.price} 
-                                                onChange={(e) => setNewItem({...newItem, price: e.target.value})}
-                                                className="w-full px-4 py-3 border-2 rounded-lg" 
-                                                placeholder="0.00" 
-                                                step="0.01" 
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block font-semibold mb-2">Stock</label>
-                                            <input 
-                                                type="number" 
-                                                value={newItem.stock} 
-                                                onChange={(e) => setNewItem({...newItem, stock: e.target.value})}
-                                                className="w-full px-4 py-3 border-2 rounded-lg" 
-                                                placeholder="0" 
-                                            />
-                                        </div>
+                                        <input type="text" value={newItem.name} onChange={(e) => setNewItem({...newItem, name: e.target.value})} className="w-full px-4 py-3 border-2 rounded-lg" placeholder="Item Name" />
+                                        <select value={newItem.category} onChange={(e) => setNewItem({...newItem, category: e.target.value})} className="w-full px-4 py-3 border-2 rounded-lg">
+                                            {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                                        </select>
+                                        <input type="number" value={newItem.price} onChange={(e) => setNewItem({...newItem, price: e.target.value})} className="w-full px-4 py-3 border-2 rounded-lg" placeholder="Price" />
+                                        <input type="number" value={newItem.stock} onChange={(e) => setNewItem({...newItem, stock: e.target.value})} className="w-full px-4 py-3 border-2 rounded-lg" placeholder="Stock" />
                                     </div>
-                                    <div className="space-y-2 mt-6">
-                                        <button 
-                                            onClick={newItem.id ? updateMenuItem : addMenuItem} 
-                                            className="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg font-bold"
-                                        >
-                                            {newItem.id ? 'Update Item' : 'Add Item'}
+                                    <div className="flex gap-4 mt-6">
+                                        <button onClick={newItem.id ? updateMenuItem : addMenuItem} className="flex-1 bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg font-bold">
+                                            {newItem.id ? 'Update' : 'Add'}
                                         </button>
-                                        <button 
-                                            onClick={() => { 
-                                                setShowAddItem(false); 
-                                                setNewItem({ name: '', category: 'Drinks', price: '', stock: '' }); 
-                                            }} 
-                                            className="w-full bg-gray-300 py-2 rounded-lg"
-                                        >
+                                        <button onClick={() => {
+                                            setShowAddItem(false);
+                                            setNewItem({ name: '', category: 'Drinks', price: '', stock: '' });
+                                        }} className="flex-1 bg-gray-300 py-3 rounded-lg">
                                             Cancel
                                         </button>
                                     </div>
@@ -1131,17 +1323,18 @@ Thank you for visiting!
                         {showDescriptionModal && (
                             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                                 <div className="bg-white rounded-2xl p-8 max-w-md w-full">
-                                    <h2 className="text-2xl font-bold mb-6">Add Table Description</h2>
-                                    <p className="text-gray-600 mb-4">Add a note for this table (optional)</p>
-                                    <textarea value={tableDescription} onChange={(e) => setTableDescription(e.target.value)} className="w-full px-4 py-3 border-2 rounded-lg mb-4" placeholder="e.g., Birthday party, 5 kids..." rows="4" />
-                                    <div className="space-y-2">
-                                        <button onClick={openTableWithDescription} className="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg font-bold">
-                                            Open Table
-                                        </button>
-                                        <button onClick={() => { setShowDescriptionModal(false); setTableDescription(''); setSelectedWaiter(null); setPendingTable(null); }} className="w-full bg-gray-300 py-2 rounded-lg">
-                                            Cancel
-                                        </button>
-                                    </div>
+                                    <h2 className="text-2xl font-bold mb-4">Table Description</h2>
+                                    <input type="text" value={tableDescription} onChange={(e) => setTableDescription(e.target.value)} className="w-full px-4 py-3 border-2 rounded-lg mb-4" placeholder="Enter description (optional)" />
+                                    <button onClick={openTableWithDescription} className="w-full bg-green-500 hover:bg-green-600 text-white py-3 rounded-lg font-bold">
+                                        Open Table
+                                    </button>
+                                    <button onClick={() => {
+                                        setShowDescriptionModal(false);
+                                        setTableDescription('');
+                                        setPendingTable(null);
+                                    }} className="mt-2 w-full bg-gray-300 py-2 rounded-lg">
+                                        Cancel
+                                    </button>
                                 </div>
                             </div>
                         )}
@@ -1149,15 +1342,10 @@ Thank you for visiting!
                         {/* Order Modal */}
                         {showOrderModal && selectedTable && (
                             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                                <div className="bg-white rounded-2xl p-6 max-w-6xl w-full max-h-screen overflow-y-auto">
-                                    <div className="flex justify-between items-center mb-4">
-                                        <div>
-                                            <h2 className="text-2xl font-bold">{selectedTable.name} - Add Items</h2>
-                                            <p className="text-sm text-gray-600">Waiter: {selectedTable.waiter?.name}</p>
-                                        </div>
-                                        <button onClick={() => { setShowOrderModal(false); setCart([]); }} className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
-                                            Close
-                                        </button>
+                                <div className="bg-white rounded-2xl p-6 max-w-5xl w-full max-h-screen overflow-y-auto">
+                                    <div className="flex justify-between items-center mb-6">
+                                        <h2 className="text-2xl font-bold">Add to {selectedTable.name}</h2>
+                                        <button onClick={() => { setShowOrderModal(false); setCart([]); }} className="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
                                     </div>
                                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                                         <div className="lg:col-span-2">
@@ -1257,60 +1445,194 @@ Thank you for visiting!
                             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                                 <div className="bg-white rounded-2xl p-8 max-w-lg w-full max-h-screen overflow-y-auto">
                                     <h2 className="text-2xl font-bold mb-4">{selectedTable.name} - Payment</h2>
-                                    <div className="bg-gray-100 p-4 rounded-lg mb-6">
-                                        <div className="flex justify-between mb-2">
-                                            <span>Subtotal:</span>
-                                            <span className="font-bold">R{getTotal(selectedTable.orders).toFixed(2)}</span>
-                                        </div>
-                                        <div className="flex justify-between mb-2">
-                                            <span>Tip:</span>
-                                            <span className="font-bold text-green-600">R{parseFloat(tipAmount || 0).toFixed(2)}</span>
-                                        </div>
-                                        <div className="border-t pt-2 flex justify-between">
-                                            <span className="text-lg font-bold">Total:</span>
-                                            <span className="text-2xl font-bold text-green-600">R{(getTotal(selectedTable.orders) + parseFloat(tipAmount || 0)).toFixed(2)}</span>
-                                        </div>
-                                    </div>
-                                    <div className="mb-4">
-                                        <label className="block font-semibold mb-2">Tip Amount</label>
-                                        <input type="number" value={tipAmount} onChange={(e) => setTipAmount(e.target.value)} className="w-full px-4 py-3 border-2 rounded-lg" placeholder="0.00" />
-                                        <div className="grid grid-cols-3 gap-2 mt-2">
-                                            {[10, 15, 20].map(p => (
-                                                <button key={p} onClick={() => setTipAmount((getTotal(selectedTable.orders) * p / 100).toFixed(2))} className="bg-gray-200 hover:bg-gray-300 py-2 rounded">
-                                                    {p}%
+                                    {!isSplitting ? (
+                                        <>
+                                            <div className="bg-gray-100 p-4 rounded-lg mb-6">
+                                                <div className="flex justify-between mb-2">
+                                                    <span>Subtotal:</span>
+                                                    <span className="font-bold">R{getTotal(selectedTable.orders).toFixed(2)}</span>
+                                                </div>
+                                                <div className="flex justify-between mb-2">
+                                                    <span>Tip:</span>
+                                                    <span className="font-bold text-green-600">R{parseFloat(tipAmount || 0).toFixed(2)}</span>
+                                                </div>
+                                                <div className="border-t pt-2 flex justify-between">
+                                                    <span className="text-lg font-bold">Total:</span>
+                                                    <span className="text-2xl font-bold text-green-600">R{(getTotal(selectedTable.orders) + parseFloat(tipAmount || 0)).toFixed(2)}</span>
+                                                </div>
+                                            </div>
+                                            <div className="mb-4">
+                                                <label className="block font-semibold mb-2">Tip Amount</label>
+                                                <input type="number" value={tipAmount} onChange={(e) => setTipAmount(e.target.value)} className="w-full px-4 py-3 border-2 rounded-lg" placeholder="0.00" />
+                                                <div className="grid grid-cols-3 gap-2 mt-2">
+                                                    {[10, 15, 20].map(p => (
+                                                        <button key={p} onClick={() => setTipAmount((getTotal(selectedTable.orders) * p / 100).toFixed(2))} className="bg-gray-200 hover:bg-gray-300 py-2 rounded">
+                                                            {p}%
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <p className="font-semibold mb-3">Payment method:</p>
+                                            <div className="grid grid-cols-2 gap-3 mb-4">
+                                                <button onClick={() => setSelectedPaymentMethod('Cash')} className={`p-4 rounded-lg font-bold border-2 ${selectedPaymentMethod === 'Cash' ? 'bg-green-500 text-white' : 'bg-gray-100'}`}>
+                                                    Cash
                                                 </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                    <p className="font-semibold mb-3">Payment method:</p>
-                                    <div className="grid grid-cols-2 gap-3 mb-4">
-                                        <button onClick={() => setSelectedPaymentMethod('Cash')} className={`p-4 rounded-lg font-bold border-2 ${selectedPaymentMethod === 'Cash' ? 'bg-green-500 text-white' : 'bg-gray-100'}`}>
-                                            Cash
-                                        </button>
-                                        <button onClick={() => setSelectedPaymentMethod('Card')} className={`p-4 rounded-lg font-bold border-2 ${selectedPaymentMethod === 'Card' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}>
-                                            Card
-                                        </button>
-                                    </div>
-                                    {selectedPaymentMethod === 'Cash' && (
-                                        <div className="mb-4">
-                                            <label className="block font-semibold mb-2">Amount Received</label>
-                                            <input type="number" value={amountReceived} onChange={(e) => setAmountReceived(e.target.value)} className="w-full px-4 py-3 border-2 rounded-lg" placeholder="0.00" />
-                                            {amountReceived && (
-                                                <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-                                                    <p className="text-sm">Change:</p>
-                                                    <p className="text-2xl font-bold text-blue-600">R{Math.max(0, parseFloat(amountReceived) - (getTotal(selectedTable.orders) + parseFloat(tipAmount || 0))).toFixed(2)}</p>
+                                                <button onClick={() => setSelectedPaymentMethod('Card')} className={`p-4 rounded-lg font-bold border-2 ${selectedPaymentMethod === 'Card' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}>
+                                                    Card
+                                                </button>
+                                            </div>
+                                            {selectedPaymentMethod === 'Cash' && (
+                                                <div className="mb-4">
+                                                    <label className="block font-semibold mb-2">Amount Received</label>
+                                                    <input type="number" value={amountReceived} onChange={(e) => setAmountReceived(e.target.value)} className="w-full px-4 py-3 border-2 rounded-lg" placeholder="0.00" />
+                                                    {amountReceived && (
+                                                        <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                                                            <p className="text-sm">Change:</p>
+                                                            <p className="text-2xl font-bold text-blue-600">R{Math.max(0, parseFloat(amountReceived) - (getTotal(selectedTable.orders) + parseFloat(tipAmount || 0))).toFixed(2)}</p>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             )}
-                                        </div>
+                                            <div className="space-y-3">
+                                                <button onClick={finalizePayment} className="w-full bg-green-500 hover:bg-green-600 text-white p-4 rounded-lg font-bold">
+                                                    Complete Payment
+                                                </button>
+                                                <button onClick={startSplitting} className="w-full bg-purple-500 hover:bg-purple-600 text-white p-4 rounded-lg font-bold">
+                                                    Split Bill
+                                                </button>
+                                                <button onClick={() => { setShowPaymentModal(false); setAmountReceived(''); setTipAmount('0'); setSelectedPaymentMethod(null); }} className="w-full bg-gray-300 hover:bg-gray-400 py-3 rounded-lg">
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <h3 className="text-xl font-bold mb-4">Split Bill</h3>
+                                            {unassignedItems.length > 0 && (
+                                                <div className="mb-6">
+                                                    <h4 className="font-bold mb-2">Unassigned Items</h4>
+                                                    <div className="space-y-2">
+                                                        {unassignedItems.map((item, idx) => (
+                                                            <div key={idx} className="flex justify-between items-center bg-gray-100 p-2 rounded">
+                                                                <span>{item.quantity}x {item.name} - R{(item.price * item.quantity).toFixed(2)}</span>
+                                                                <div className="flex gap-1">
+                                                                    {payers.map(p => (
+                                                                        <button key={p.id} onClick={() => assignItemToPayer(idx, p.id)} className="bg-blue-500 text-white px-2 py-1 rounded text-xs">
+                                                                            To {p.id}
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            <div className="space-y-6">
+                                                {payers.map((payer, payerIdx) => (
+                                                    <div key={payer.id} className={`border-2 p-4 rounded-lg ${payer.paid ? 'bg-green-50 border-green-300' : 'bg-white'}`}>
+                                                        <div className="flex justify-between mb-2">
+                                                            <h4 className="font-bold">Payer {payer.id}</h4>
+                                                            {payer.paid && <span className="text-green-600 font-bold">PAID</span>}
+                                                        </div>
+                                                        <div className="mb-4">
+                                                            <h5 className="text-sm font-semibold mb-1">Items</h5>
+                                                            {payer.items.length === 0 ? (
+                                                                <p className="text-gray-500">No items</p>
+                                                            ) : (
+                                                                <div className="space-y-1">
+                                                                    {payer.items.map((item, itemIdx) => (
+                                                                        <div key={itemIdx} className="flex justify-between items-center text-sm">
+                                                                            <span>{item.quantity}x {item.name}</span>
+                                                                            <span>R{(item.price * item.quantity).toFixed(2)}</span>
+                                                                            {!payer.paid && (
+                                                                                <button onClick={() => removeItemFromPayer(payer.id, itemIdx)} className="text-red-500 text-xs">Remove</button>
+                                                                            )}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        {!payer.paid && (
+                                                            <>
+                                                                <div className="mb-2">
+                                                                    <label className="block text-sm font-semibold mb-1">Tip</label>
+                                                                    <input 
+                                                                        type="number" 
+                                                                        value={payer.tip} 
+                                                                        onChange={(e) => updatePayerTip(payer.id, e.target.value)} 
+                                                                        className="w-full px-2 py-1 border rounded" 
+                                                                        placeholder="0.00" 
+                                                                    />
+                                                                </div>
+                                                                <div className="mb-2">
+                                                                    <label className="block text-sm font-semibold mb-1">Payment Method</label>
+                                                                    <div className="grid grid-cols-2 gap-2">
+                                                                        <button 
+                                                                            onClick={() => setPayerPaymentMethod(payer.id, 'Cash')} 
+                                                                            className={`p-2 rounded font-bold ${payer.paymentMethod === 'Cash' ? 'bg-green-500 text-white' : 'bg-gray-100'}`}
+                                                                        >
+                                                                            Cash
+                                                                        </button>
+                                                                        <button 
+                                                                            onClick={() => setPayerPaymentMethod(payer.id, 'Card')} 
+                                                                            className={`p-2 rounded font-bold ${payer.paymentMethod === 'Card' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}
+                                                                        >
+                                                                            Card
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+                                                                {payer.paymentMethod === 'Cash' && (
+                                                                    <div className="mb-2">
+                                                                        <label className="block text-sm font-semibold mb-1">Amount Received</label>
+                                                                        <input 
+                                                                            type="number" 
+                                                                            value={payer.amountReceived} 
+                                                                            onChange={(e) => updatePayerAmountReceived(payer.id, e.target.value)} 
+                                                                            className="w-full px-2 py-1 border rounded" 
+                                                                            placeholder="0.00" 
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                                <div className="bg-gray-100 p-2 rounded mb-2">
+                                                                    <div className="flex justify-between text-sm">
+                                                                        <span>Subtotal:</span>
+                                                                        <span>R{getTotal(payer.items).toFixed(2)}</span>
+                                                                    </div>
+                                                                    <div className="flex justify-between text-sm">
+                                                                        <span>Tip:</span>
+                                                                        <span>R{parseFloat(payer.tip || 0).toFixed(2)}</span>
+                                                                    </div>
+                                                                    <div className="flex justify-between font-bold">
+                                                                        <span>Total:</span>
+                                                                        <span>R{(getTotal(payer.items) + parseFloat(payer.tip || 0)).toFixed(2)}</span>
+                                                                    </div>
+                                                                </div>
+                                                                <button 
+                                                                    onClick={() => finalizeSplitPayment(payerIdx)} 
+                                                                    disabled={payer.items.length === 0 || !payer.paymentMethod} 
+                                                                    className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded font-bold disabled:opacity-50"
+                                                                >
+                                                                    Pay Payer {payer.id}
+                                                                </button>
+                                                            </>
+                                                        )}
+                                                        <button 
+                                                            onClick={() => printPayerBill(payer, payer.id)} 
+                                                            className="w-full bg-purple-500 hover:bg-purple-600 text-white py-2 rounded mt-2 font-bold"
+                                                        >
+                                                            Print Split {payer.id}
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <button onClick={addPayer} disabled={payers.length >= 5} className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded mt-4 font-bold disabled:opacity-50">
+                                                Add Payer (Max 5)
+                                            </button>
+                                            <button onClick={cancelSplitting} className="w-full bg-gray-300 hover:bg-gray-400 py-2 rounded mt-2">
+                                                Cancel Split
+                                            </button>
+                                        </>
                                     )}
-                                    <div className="space-y-3">
-                                        <button onClick={finalizePayment} className="w-full bg-green-500 hover:bg-green-600 text-white p-4 rounded-lg font-bold">
-                                            Complete Payment
-                                        </button>
-                                        <button onClick={() => { setShowPaymentModal(false); setAmountReceived(''); setTipAmount('0'); setSelectedPaymentMethod(null); }} className="w-full bg-gray-300 hover:bg-gray-400 py-3 rounded-lg">
-                                            Cancel
-                                        </button>
-                                    </div>
                                 </div>
                             </div>
                         )}
@@ -1357,6 +1679,9 @@ Thank you for visiting!
                                     <button onClick={() => openPaymentModal(table)} className="w-full bg-green-500 hover:bg-green-600 text-white py-1 rounded text-xs font-semibold">
                                         Payment
                                     </button>
+                                    <button onClick={() => clearBill(table)} className="w-full bg-red-500 hover:bg-red-600 text-white py-1 rounded text-xs font-semibold">
+                                        Clear Bill
+                                    </button>
                                 </div>
                             </div>
                         )}
@@ -1401,6 +1726,9 @@ Thank you for visiting!
                                     <button onClick={() => openPaymentModal(table)} className="w-full bg-green-500 hover:bg-green-600 text-white py-1 rounded text-xs font-semibold">
                                         Payment
                                     </button>
+                                    <button onClick={() => clearBill(table)} className="w-full bg-red-500 hover:bg-red-600 text-white py-1 rounded text-xs font-semibold">
+                                        Clear Bill
+                                    </button>
                                 </div>
                             </div>
                         )}
@@ -1444,6 +1772,9 @@ Thank you for visiting!
                                     </button>
                                     <button onClick={() => openPaymentModal(table)} className="w-full bg-green-500 hover:bg-green-600 text-white py-1 rounded text-xs font-semibold">
                                         Payment
+                                    </button>
+                                    <button onClick={() => clearBill(table)} className="w-full bg-red-500 hover:bg-red-600 text-white py-1 rounded text-xs font-semibold">
+                                        Clear Bill
                                     </button>
                                 </div>
                             </div>
