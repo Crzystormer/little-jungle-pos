@@ -13,6 +13,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+	<script src="epos-2.27.0.js"></script>
     <style>
         body {
             margin: 0;
@@ -229,25 +230,29 @@
             status: 'available',
             orders: [],
             waiter: null,
-            description: ''
+            description: '',
+			partiallyPaid: false
         })),
-        // MONKEY AREA (20-24)
+		// ELEPHANT AREA (20-22)
         ...Array.from({length: 5}, (_, i) => ({
             id: 20 + i,
-            name: `Monkey ${i + 1}`,
-            status: 'available',
-            orders: [],
-            waiter: null,
-            description: ''
-        })),
-        // ELEPHANT AREA (30-32)
-        ...Array.from({length: 3}, (_, i) => ({
-            id: 30 + i,
             name: `Elephant ${i + 1}`,
             status: 'available',
             orders: [],
             waiter: null,
-            description: ''
+            description: '',
+			partiallyPaid: false
+                })),
+				// MONKEY AREA (30-32)
+        ...Array.from({length: 3}, (_, i) => ({
+            id: 30 + i,
+            name: `Monkey ${i + 1}`,
+            status: 'available',
+            orders: [],
+            waiter: null,
+            description: '',
+			partiallyPaid: false
+        
         }))
     ]
 ));
@@ -372,29 +377,33 @@
 
             // === NETWORK PRINTER (192.168.0.162:9100) ===
             const PRINTER_IP = '192.168.0.162';
-            const PRINTER_PORT = 9100;
-
+            
             const printViaNetwork = async (content) => {
-                try {
-                    const socket = new TCPSocket(PRINTER_IP, PRINTER_PORT);
-                    await socket.opened;
+    try {
+        // Initialize Epson printer object (use HTTP endpoint for network printers)
+        const address = 'http://' + PRINTER_IP + '/cgi-bin/epos/service.cgi?devid=local_printer&timeout=30000';
+        const printer = new epson.ePOSPrint(address);
 
-                    const writer = socket.writable.getWriter();
-                    const encoder = new TextEncoder();
-                    const data = encoder.encode(content + '\n\n\n'); // Add line feeds for cut
+        // Build print data
+        const builder = new epson.ePOSBuilder();
+        builder.addTextAlign(builder.ALIGN_CENTER);  // Optional: Center text
+        builder.addTextSize(1, 1);  // Normal size (adjust if needed for slip printer)
+        builder.addText(content + '\n\n');  // Add your content + extra lines
+        builder.addCut(builder.CUT_FEED);  // Cut paper after printing
 
-                    await writer.write(data);
-                    await writer.close();
-                    await socket.close();
+        // Send print job
+        printer.open();
+        printer.send(builder.toString());
+        printer.close();
 
-                    console.log('Printed via network printer');
-                    return true;
-                } catch (error) {
-                    console.error('Network print failed:', error);
-                    alert('Failed to print. Check printer IP, network, and browser permissions.');
-                    return false;
-                }
-            };
+        console.log('Printed successfully via Epson SDK');
+        return true;
+    } catch (error) {
+        console.error('Print failed:', error);
+        alert('Failed to print. Check printer IP, network, and if ePOS SDK is loaded. Error: ' + error.message);
+        return false;
+    }
+};
 
             const exportAllData = () => {
                 const exportData = {
@@ -513,9 +522,13 @@
             };
 
             const addItemsToTable = (table) => {
-                setSelectedTable(table);
-                setShowOrderModal(true);
-            };
+    if (table.status !== 'occupied') {
+        alert('Table is not open!');
+        return;
+    }
+    setSelectedTable(table);
+    setShowOrderModal(true);
+};
 
             const addToTableOrder = () => {
                 if (cart.length === 0 || !selectedTable) return;
@@ -593,76 +606,100 @@
                 setSelectedTable(null);
             };
 
-            const finalizeSplitPayment = (payerIndex) => {
-                const payer = payers[payerIndex];
-                if (!payer.paymentMethod) {
-                    alert('Please select payment method for this payer!');
-                    return;
-                }
-                const billTotal = getTotal(payer.items);
-                const tip = parseFloat(payer.tip) || 0;
-                const total = billTotal + tip;
-                const received = parseFloat(payer.amountReceived) || 0;
-                if (payer.paymentMethod === 'Cash' && received < total) {
-                    alert(`Insufficient for payer ${payerIndex + 1}! Need R${total.toFixed(2)}`);
-                    return;
-                }
-                const change = payer.paymentMethod === 'Cash' ? received - total : 0;
-                const sale = {
-                    id: Date.now(),
-                    tableName: `${selectedTable.name} (Split ${payerIndex + 1})`,
-                    waiter: selectedTable.waiter,
-                    items: [...payer.items],
-                    subtotal: billTotal,
-                    tip: tip,
-                    total: total,
-                    paymentMethod: payer.paymentMethod,
-                    timestamp: new Date().toLocaleString(),
-                    date: new Date().toISOString().split('T')[0],
-                    description: selectedTable.description
-                };
-                setSales([sale, ...sales]);
-                setHistoricalSales([sale, ...historicalSales]);
-                setWaiters(waiters.map(w => 
-                    w.id === selectedTable.waiter.id 
-                        ? { ...w, sales: [...w.sales, sale] } 
-                        : w
-                ));
-                setInventory(inventory.map(item => {
-                    const orderItem = payer.items.find(o => o.id === item.id);
-                    if (orderItem) {
-                        return { ...item, stock: item.stock - orderItem.quantity };
-                    }
-                    return item;
-                }));
-                // Mark payer as paid
-                const updatedPayers = [...payers];
-                updatedPayers[payerIndex] = { ...payer, paid: true };
-                setPayers(updatedPayers);
+                        const finalizeSplitPayment = (payerIndex) => {
+    const payer = payers[payerIndex];
 
-                // Print split bill
-                printSplitBill(sale, payerIndex + 1);
+    if (!payer.paymentMethod) {
+        alert('Please select payment method for this payer!');
+        return;
+    }
+    if (payer.items.length === 0) {
+        alert('This payer has no items!');
+        return;
+    }
 
-                if (change > 0) {
-                    alert(`Payment for payer ${payerIndex + 1} completed!\nChange: R${change.toFixed(2)}`);
-                } else {
-                    alert(`Payment for payer ${payerIndex + 1} completed!`);
-                }
+    const billTotal = getTotal(payer.items);
+    const tip = parseFloat(payer.tip) || 0;
+    const total = billTotal + tip;
+    const received = parseFloat(payer.amountReceived) || 0;
 
-                // Check if all payers paid and no unassigned items
-                if (updatedPayers.every(p => p.paid) && unassignedItems.length === 0) {
-                    setTables(tables.map(t => 
-                        t.id === selectedTable.id 
-                            ? { ...t, status: 'available', orders: [], waiter: null, description: '' }
-                            : t
-                    ));
-                    setShowPaymentModal(false);
-                    setSelectedTable(null);
-                    setIsSplitting(false);
-                    setPayers([]);
-                    setUnassignedItems([]);
-                }
-            };
+    if (payer.paymentMethod === 'Cash' && received < total) {
+        alert(`Insufficient for payer ${payerIndex + 1}! Need R${total.toFixed(2)}`);
+        return;
+    }
+    const change = payer.paymentMethod === 'Cash' ? received - total : 0;
+
+    // Create sale record
+    const sale = {
+        id: Date.now() + payerIndex,
+        tableName: `${selectedTable.name} (Split ${payerIndex + 1})`,
+        waiter: selectedTable.waiter,
+        items: [...payer.items],
+        subtotal: billTotal,
+        tip: tip,
+        total: total,
+        paymentMethod: payer.paymentMethod,
+        timestamp: new Date().toLocaleString(),
+        date: new Date().toISOString().split('T')[0],
+        description: selectedTable.description
+    };
+
+    setSales(prev => [sale, ...prev]);
+    setHistoricalSales(prev => [sale, ...prev]);
+
+    setWaiters(waiters.map(w =>
+        w.id === selectedTable.waiter.id
+            ? { ...w, sales: [...w.sales, sale] }
+            : w
+    ));
+
+    // Reduce stock
+    setInventory(inventory.map(item => {
+        const ordered = payer.items.find(i => i.id === item.id);
+        return ordered ? { ...item, stock: item.stock - ordered.quantity } : item;
+    }));
+
+    // REMOVE PAID ITEMS FROM TABLE
+    const remainingOrders = selectedTable.orders
+        .map(tableItem => {
+            const paidItem = payer.items.find(p => p.id === tableItem.id);
+            if (!paidItem) return tableItem;
+            const newQty = tableItem.quantity - paidItem.quantity;
+            return newQty > 0 ? { ...tableItem, quantity: newQty } : null;
+        })
+        .filter(Boolean);
+
+    // UPDATE TABLE + MARK AS PARTIALLY PAID
+    setTables(tables.map(t =>
+        t.id === selectedTable.id
+            ? { ...t, orders: remainingOrders, partiallyPaid: true }
+            : t
+    ));
+
+    setSelectedTable(prev => ({
+        ...prev,
+        orders: remainingOrders,
+        partiallyPaid: true
+    }));
+
+    // CRITICAL: MARK THIS PAYER AS PAID AND LOCKED FOREVER
+    setPayers(payers.map((p, i) =>
+        i === payerIndex
+            ? { ...p, paid: true, locked: true }  // ← locked = cannot edit anymore
+            : p
+    ));
+
+    alert(change > 0
+        ? `Payer ${payerIndex + 1} paid! Change: R${change.toFixed(2)}`
+        : `Payer ${payerIndex + 1} paid successfully!`
+    );
+
+    // Auto-close if everyone paid
+    if (payers.every(p => p.paid)) {
+        setShowPaymentModal(false);
+        setSelectedTable(null);
+    }
+};
 
             const finalizeDayCashUp = () => {
     // CHECK IF ALL TABLES ARE CLOSED
@@ -1105,23 +1142,86 @@ Thank you for visiting!
             };
 
             const assignItemToPayer = (itemIndex, payerId) => {
-                const item = unassignedItems[itemIndex];
-                const updatedUnassigned = unassignedItems.filter((_, idx) => idx !== itemIndex);
-                setUnassignedItems(updatedUnassigned);
-                setPayers(payers.map(p => 
-                    p.id === payerId ? { ...p, items: [...p.items, item] } : p
-                ));
-            };
+    const payer = payers.find(p => p.id === payerId);
 
-            const removeItemFromPayer = (payerId, itemIndex) => {
-                const payer = payers.find(p => p.id === payerId);
-                const item = payer.items[itemIndex];
-                const updatedItems = payer.items.filter((_, idx) => idx !== itemIndex);
-                setPayers(payers.map(p => 
-                    p.id === payerId ? { ...p, items: updatedItems } : p
-                ));
-                setUnassignedItems([...unassignedItems, item]);
-            };
+    // BLOCK IF PAYER ALREADY PAID
+    if (payer.paid || payer.locked) {
+        alert(`Payer ${payerId} has already paid. You cannot add more items to them.`);
+        return;
+    }
+
+    const item = unassignedItems[itemIndex];
+
+    if (item.quantity === 1) {
+        // Simple case: only one unit → move whole item
+        const updatedUnassigned = unassignedItems.filter((_, idx) => idx !== itemIndex);
+        setUnassignedItems(updatedUnassigned);
+        setPayers(payers.map(p =>
+            p.id === payerId ? { ...p, items: [...p.items, item] } : p
+        ));
+    } else {
+        // Quantity > 1 → ask how many to assign
+        const qtyToMove = prompt(`How many "${item.name}" to assign to Payer ${payerId}?\n(Available: ${item.quantity})`, "1");
+        if (!qtyToMove || isNaN(qtyToMove)) return;
+
+        const moveCount = Math.max(1, Math.min(parseInt(qtyToMove), item.quantity));
+
+        // Create item for the payer
+        const itemForPayer = { ...item, quantity: moveCount };
+
+        // Reduce quantity in unassigned list
+        let updatedUnassigned;
+        if (moveCount === item.quantity) {
+            updatedUnassigned = unassignedItems.filter((_, idx) => idx !== itemIndex);
+        } else {
+            updatedUnassigned = unassignedItems.map((it, idx) =>
+                idx === itemIndex ? { ...it, quantity: it.quantity - moveCount } : it
+            );
+        }
+        setUnassignedItems(updatedUnassigned);
+
+        // Add to payer
+        setPayers(payers.map(p =>
+            p.id === payerId ? { ...p, items: [...p.items, itemForPayer] } : p
+        ));
+    }
+};
+                        const removeItemFromPayer = (payerId, itemIndex) => {
+    const payer = payers.find(p => p.id === payerId);
+
+    // BLOCK IF PAYER ALREADY PAID
+    if (payer.paid || payer.locked) {
+        alert(`Payer ${payerId} has already paid. You cannot remove or change their items.`);
+        return;
+    }
+
+    const item = payer.items[itemIndex];
+
+    // 1. Remove (or reduce) the item from this payer
+    const updatedPayerItems = payer.items.filter((_, idx) => idx !== itemIndex);
+
+    // 2. Add the quantity back to unassigned list (merge with same item if already there)
+    const existingUnassignedIndex = unassignedItems.findIndex(
+        i => i.id === item.id && i.name === item.name && i.price === item.price
+    );
+
+    let updatedUnassigned;
+    if (existingUnassignedIndex >= 0) {
+        updatedUnassigned = unassignedItems.map((it, idx) =>
+            idx === existingUnassignedIndex
+                ? { ...it, quantity: it.quantity + item.quantity }
+                : it
+        );
+    } else {
+        updatedUnassigned = [...unassignedItems, { ...item }];
+    }
+
+    // Update state
+    setUnassignedItems(updatedUnassigned);
+    setPayers(payers.map(p =>
+        p.id === payerId ? { ...p, items: updatedPayerItems } : p
+    ));
+};
 
             const updatePayerTip = (payerId, value) => {
                 setPayers(payers.map(p => 
@@ -1628,7 +1728,22 @@ Thank you for visiting!
                                             <button onClick={addPayer} disabled={payers.length >= 5} className="w-full bg-blue-500 hover:bg-blue-600 text-white py-2 rounded mt-4 font-bold disabled:opacity-50">
                                                 Add Payer (Max 5)
                                             </button>
-                                            <button onClick={cancelSplitting} className="w-full bg-gray-300 hover:bg-gray-400 py-2 rounded mt-2">
+											<button
+                onClick={() => {
+                    if (payers.some(p => p.paid)) {
+                        if (window.confirm('One or more splits have already been paid. Close this screen and continue later?')) {
+                            setShowPaymentModal(false);
+                            // Table stays open with remaining items – perfect!
+                        }
+                    } else {
+                        setShowPaymentModal(false);
+                    }
+                }}
+                className="w-full mt-4 bg-gray-600 hover:bg-gray-700 text-white font-bold py-4 rounded-lg text-lg"
+            >
+                ← Back to Table (Keep Open)
+            </button>
+                                                       <button onClick={cancelSplitting} className="w-full bg-gray-300 hover:bg-gray-400 py-2 rounded mt-2">
                                                 Cancel Split
                                             </button>
                                         </>
@@ -1670,19 +1785,29 @@ Thank you for visiting!
                                     <p>Total: <span className="font-semibold text-green-600">R{getTotal(table.orders)}</span></p>
                                 </div>
                                 <div className="space-y-1">
-                                    <button onClick={() => addItemsToTable(table)} className="w-full bg-blue-500 hover:bg-blue-600 text-white py-1 rounded text-xs font-semibold">
-                                        Add Items
-                                    </button>
-                                    <button onClick={() => printBill(table)} className="w-full bg-purple-500 hover:bg-purple-600 text-white py-1 rounded text-xs font-semibold">
-                                        Print
-                                    </button>
-                                    <button onClick={() => openPaymentModal(table)} className="w-full bg-green-500 hover:bg-green-600 text-white py-1 rounded text-xs font-semibold">
-                                        Payment
-                                    </button>
-                                    <button onClick={() => clearBill(table)} className="w-full bg-red-500 hover:bg-red-600 text-white py-1 rounded text-xs font-semibold">
-                                        Clear Bill
-                                    </button>
-                                </div>
+    <button 
+    onClick={() => addItemsToTable(table)}
+    disabled={table.status !== 'occupied'}
+    className={`w-full py-1 rounded text-xs font-semibold transition-all ${
+        table.status !== 'occupied'
+            ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
+            : 'bg-blue-600 hover:bg-blue-700 text-white'
+    }`}
+    title={table.partiallyPaid ? 'Partially paid – adding still allowed' : ''}
+>
+    {table.partiallyPaid ? 'Add More (±)' : 'Add Items'}
+        {table.partiallyPaid && <span className="ml-1 text-xs">±</span>}
+</button>
+    <button onClick={() => printBill(table)} className="w-full bg-purple-500 hover:bg-purple-600 text-white py-1 rounded text-xs font-semibold">
+        Print
+    </button>
+    <button onClick={() => openPaymentModal(table)} className="w-full bg-green-500 hover:bg-green-600 text-white py-1 rounded text-xs font-semibold">
+        Payment
+    </button>
+    <button onClick={() => clearBill(table)} className="w-full bg-red-500 hover:bg-red-600 text-white py-1 rounded text-xs font-semibold">
+        Clear Bill
+    </button>
+</div>
                             </div>
                         )}
                     </div>
@@ -1690,61 +1815,14 @@ Thank you for visiting!
             </div>
         </div>
 
-        {/* SECTION 2: MONKEY AREA */}
-        <div className="mb-8">
-            <div className="flex items-center mb-4">
-                <div className="w-4 h-4 bg-orange-500 rounded mr-2"></div>
-                <h3 className="text-xl font-bold text-orange-800">🐒 MONKEY AREA (Tables 20-24)</h3>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                {tables.filter(table => [20,21,22,23,24].includes(table.id)).map(table => (
-                    <div key={table.id} className={`border-2 rounded-lg p-4 ${table.status === 'available' ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
-                        <div className="text-center mb-3">
-                            <h3 className="text-lg font-bold">{table.name}</h3>
-                            <p className={`text-xs font-semibold ${table.status === 'available' ? 'text-green-600' : 'text-red-600'}`}>
-                                {table.status === 'available' ? 'Available' : 'Occupied'}
-                            </p>
-                        </div>
-                        {table.status === 'available' ? (
-                            <button onClick={() => openTable(table)} className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-sm font-semibold">
-                                Open
-                            </button>
-                        ) : (
-                            <div>
-                                <div className="text-xs mb-2">
-                                    <p>Waiter: <span className="font-semibold">{table.waiter?.name}</span></p>
-                                    <p>Items: <span className="font-semibold">{table.orders.length}</span></p>
-                                    <p>Total: <span className="font-semibold text-green-600">R{getTotal(table.orders)}</span></p>
-                                </div>
-                                <div className="space-y-1">
-                                    <button onClick={() => addItemsToTable(table)} className="w-full bg-blue-500 hover:bg-blue-600 text-white py-1 rounded text-xs font-semibold">
-                                        Add Items
-                                    </button>
-                                    <button onClick={() => printBill(table)} className="w-full bg-purple-500 hover:bg-purple-600 text-white py-1 rounded text-xs font-semibold">
-                                        Print
-                                    </button>
-                                    <button onClick={() => openPaymentModal(table)} className="w-full bg-green-500 hover:bg-green-600 text-white py-1 rounded text-xs font-semibold">
-                                        Payment
-                                    </button>
-                                    <button onClick={() => clearBill(table)} className="w-full bg-red-500 hover:bg-red-600 text-white py-1 rounded text-xs font-semibold">
-                                        Clear Bill
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                ))}
-            </div>
-        </div>
-
-        {/* SECTION 3: ELEPHANT AREA */}
+        {/* SECTION 2: ELEPHANT AREA */}
         <div className="mb-8">
             <div className="flex items-center mb-4">
                 <div className="w-4 h-4 bg-purple-500 rounded mr-2"></div>
-                <h3 className="text-xl font-bold text-purple-800">🐘 ELEPHANT AREA (Tables 30-32)</h3>
+                <h3 className="text-xl font-bold text-purple-800">🐘 ELEPHANT AREA (Tables 20-24)</h3>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {tables.filter(table => [30,31,32].includes(table.id)).map(table => (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                	{tables.filter(table => [20,21,22,23,24].includes(table.id)).map(table => (
                     <div key={table.id} className={`border-2 rounded-lg p-4 ${table.status === 'available' ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
                         <div className="text-center mb-3">
                             <h3 className="text-lg font-bold">{table.name}</h3>
@@ -1764,9 +1842,76 @@ Thank you for visiting!
                                     <p>Total: <span className="font-semibold text-green-600">R{getTotal(table.orders)}</span></p>
                                 </div>
                                 <div className="space-y-1">
-                                    <button onClick={() => addItemsToTable(table)} className="w-full bg-blue-500 hover:bg-blue-600 text-white py-1 rounded text-xs font-semibold">
-                                        Add Items
+                                    <button 
+    onClick={() => addItemsToTable(table)}
+    disabled={table.status !== 'occupied'}
+    className={`w-full py-1 rounded text-xs font-semibold transition-all ${
+        table.status !== 'occupied'
+            ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
+            : 'bg-blue-600 hover:bg-blue-700 text-white'
+    }`}
+    title={table.partiallyPaid ? 'Partially paid – adding still allowed' : ''}
+>
+    {table.partiallyPaid ? 'Add More (±)' : 'Add Items'}
+        {table.partiallyPaid && <span className="ml-1 text-xs">±</span>}
+</button>
+                                    <button onClick={() => printBill(table)} className="w-full bg-purple-500 hover:bg-purple-600 text-white py-1 rounded text-xs font-semibold">
+                                        Print
                                     </button>
+                                    <button onClick={() => openPaymentModal(table)} className="w-full bg-green-500 hover:bg-green-600 text-white py-1 rounded text-xs font-semibold">
+                                        Payment
+                                    </button>
+                                    <button onClick={() => clearBill(table)} className="w-full bg-red-500 hover:bg-red-600 text-white py-1 rounded text-xs font-semibold">
+                                        Clear Bill
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+
+        {/* SECTION 3: MONKEY AREA */}
+        <div className="mb-8">
+            <div className="flex items-center mb-4">
+                <div className="w-4 h-4 bg-orange-500 rounded mr-2"></div>
+                <h3 className="text-xl font-bold text-orange-800">🐒 MONKEY AREA (Tables 30-32)</h3>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                {tables.filter(table => [30,31,32].includes(table.id)).map(table => (
+                    <div key={table.id} className={`border-2 rounded-lg p-4 ${table.status === 'available' ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
+					<div className="text-center mb-3">
+                            <h3 className="text-lg font-bold">{table.name}</h3>
+                            <p className={`text-xs font-semibold ${table.status === 'available' ? 'text-green-600' : 'text-red-600'}`}>
+                                {table.status === 'available' ? 'Available' : 'Occupied'}
+                            </p>
+                        </div>
+                        {table.status === 'available' ? (
+                            <button onClick={() => openTable(table)} className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-sm font-semibold">
+                                Open
+                            </button>
+                        ) : (
+                            <div>
+                                <div className="text-xs mb-2">
+                                    <p>Waiter: <span className="font-semibold">{table.waiter?.name}</span></p>
+                                    <p>Items: <span className="font-semibold">{table.orders.length}</span></p>
+                                    <p>Total: <span className="font-semibold text-green-600">R{getTotal(table.orders)}</span></p>
+                                </div>
+                                <div className="space-y-1">
+                                    <button 
+    onClick={() => addItemsToTable(table)}
+    disabled={table.status !== 'occupied'}
+    className={`w-full py-1 rounded text-xs font-semibold transition-all ${
+        table.status !== 'occupied'
+            ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
+            : 'bg-blue-600 hover:bg-blue-700 text-white'
+    }`}
+    title={table.partiallyPaid ? 'Partially paid – adding still allowed' : ''}
+>
+    {table.partiallyPaid ? 'Add More (±)' : 'Add Items'}
+        {table.partiallyPaid && <span className="ml-1 text-xs">±</span>}
+</button>
                                     <button onClick={() => printBill(table)} className="w-full bg-purple-500 hover:bg-purple-600 text-white py-1 rounded text-xs font-semibold">
                                         Print
                                     </button>
@@ -1802,7 +1947,7 @@ Thank you for visiting!
                         <div className="w-2 h-2 bg-orange-500 rounded"></div>
                         <div className="w-2 h-2 bg-purple-500 rounded"></div>
                     </div>
-                    <span>Main | Monkey | Elephant</span>
+                    <span>Main | Elephant | Monkey</span>
                 </div>
             </div>
         </div>
