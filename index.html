@@ -377,7 +377,8 @@
 
             // === NETWORK PRINTER (192.168.0.162:9100) ===
             const PRINTER_IP = '192.168.0.162';
-            
+            const PRINTER_PORT = 80;
+
             const printViaNetwork = async (content) => {
     try {
         // Initialize Epson printer object (use HTTP endpoint for network printers)
