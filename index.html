@@ -603,6 +603,8 @@
                 } else {
                     alert('Payment completed!');
                 }
+				printBill(selectedTable);
+				
                 setShowPaymentModal(false);
                 setSelectedTable(null);
             };
@@ -695,7 +697,11 @@
         : `Payer ${payerIndex + 1} paid successfully!`
     );
 
-    // Auto-close if everyone paid
+    // ←←← ADD THESE TWO LINES HERE ←←←
+    // Print receipt for this specific payer automatically
+    printPayerBill(payer, payerIndex + 1);
+
+    // Auto-close modal only when ALL payers are paid
     if (payers.every(p => p.paid)) {
         setShowPaymentModal(false);
         setSelectedTable(null);
@@ -2289,4 +2295,5 @@ Thank you for visiting!
 </body>
 
 </html>
+
 
