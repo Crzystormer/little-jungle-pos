@@ -381,27 +381,25 @@
 
             const printViaNetwork = async (content) => {
     try {
-        // Initialize Epson printer object (use HTTP endpoint for network printers)
-        const address = 'http://' + PRINTER_IP + '/cgi-bin/epos/service.cgi?devid=local_printer&timeout=30000';
+        const address = 'http://192.168.0.163/cgi-bin/epos/service.cgi?devid=local_printer&timeout=30000';
         const printer = new epson.ePOSPrint(address);
 
-        // Build print data
         const builder = new epson.ePOSBuilder();
-        builder.addTextAlign(builder.ALIGN_CENTER);  // Optional: Center text
-        builder.addTextSize(1, 1);  // Normal size (adjust if needed for slip printer)
-        builder.addText(content + '\n\n');  // Add your content + extra lines
-        builder.addCut(builder.CUT_FEED);  // Cut paper after printing
+        builder.addTextAlign(builder.ALIGN_CENTER);
+        builder.addTextFont(builder.FONT_A);
+        builder.addTextSize(1, 1);
+        builder.addText(content);
+        builder.addCut(builder.CUT_FEED);
 
-        // Send print job
         printer.open();
         printer.send(builder.toString());
         printer.close();
 
-        console.log('Printed successfully via Epson SDK');
+        console.log('Printed to receipt printer');
         return true;
     } catch (error) {
-        console.error('Print failed:', error);
-        alert('Failed to print. Check printer IP, network, and if ePOS SDK is loaded. Error: ' + error.message);
+        console.error('Printer error:', error);
+        alert('Could not print to receipt printer – opening browser print instead');
         return false;
     }
 };
@@ -2234,6 +2232,7 @@ Tips   R${wtip.toFixed(2)}
 </body>
 
 </html>
+
 
 
 
