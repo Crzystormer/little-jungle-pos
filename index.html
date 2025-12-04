@@ -549,7 +549,7 @@
                 setSelectedPaymentMethod(null);
             };
 
-            const finalizePayment = () => {
+                        const finalizePayment = async () => {
                 if (!selectedPaymentMethod) {
                     alert('Please select payment method!');
                     return;
@@ -558,11 +558,13 @@
                 const tip = parseFloat(tipAmount) || 0;
                 const total = billTotal + tip;
                 const received = parseFloat(amountReceived) || 0;
+
                 if (selectedPaymentMethod === 'Cash' && received < total) {
                     alert(`Insufficient! Need R${total.toFixed(2)}`);
                     return;
                 }
                 const change = selectedPaymentMethod === 'Cash' ? received - total : 0;
+
                 const sale = {
                     id: Date.now(),
                     tableName: selectedTable.name,
@@ -576,9 +578,10 @@
                     date: new Date().toISOString().split('T')[0],
                     description: selectedTable.description
                 };
+
+                // Save sale + update everything
                 setSales([sale, ...sales]);
                 setHistoricalSales([sale, ...historicalSales]);
-                // FIXED: Update waiter's sales array
                 setWaiters(waiters.map(w => 
                     w.id === selectedTable.waiter.id 
                         ? { ...w, sales: [...w.sales, sale] } 
@@ -586,125 +589,137 @@
                 ));
                 setInventory(inventory.map(item => {
                     const orderItem = selectedTable.orders.find(o => o.id === item.id);
-                    if (orderItem) {
-                        return { ...item, stock: item.stock - orderItem.quantity };
-                    }
+                    if (orderItem) return { ...item, stock: item.stock - orderItem.quantity };
                     return item;
                 }));
                 setTables(tables.map(t => 
                     t.id === selectedTable.id 
-                        ? { ...t, status: 'available', orders: [], waiter: null, description: '' }
+                        ? { ...t, status: 'available', orders: [], waiter: null, description: '', partiallyPaid: false }
                         : t
                 ));
-                if (change > 0) {
-                    alert(`Payment completed!\nChange: R${change.toFixed(2)}`);
-                } else {
-                    alert('Payment completed!');
+
+                // PRINT RECEIPT WITH TIP
+                const receiptText = `
+LITTLE JUNGLE PLAYGROUND
+${new Date().toLocaleString()}
+----------------------------------------
+${selectedTable.name}
+Waiter: ${selectedTable.waiter?.name || 'N/A'}
+${selectedTable.description ? 'Note: ' + selectedTable.description : ''}
+----------------------------------------
+${selectedTable.orders.map(i => `${i.quantity}x ${i.name.padEnd(20)} R${(i.price * i.quantity).toFixed(2)}`).join('\n')}
+----------------------------------------
+SUBTOTAL:                R${billTotal.toFixed(2)}
+TIP:                     R${tip.toFixed(2)}
+TOTAL:                   R${total.toFixed(2)}
+${selectedPaymentMethod === 'Cash' ? `Received:             R${received.toFixed(2)}\nChange:               R${change.toFixed(2)}` : ''}
+----------------------------------------
+Thank you! Come again!
+                `.trim();
+
+                await printViaNetwork(receiptText);
+
+                // Fallback if printer fails
+                if (!(await printViaNetwork(receiptText))) {
+                    alert('Printer not responding – opening print window');
+                    const win = window.open('', '_blank');
+                    win.document.write(`<pre style="font-family:monospace">${receiptText}</pre>`);
+                    win.document.close();
+                    win.print();
                 }
-				printBill(selectedTable);
-				
+
+                alert(change > 0 ? `Payment complete! Change R${change.toFixed(2)}` : 'Payment complete!');
                 setShowPaymentModal(false);
                 setSelectedTable(null);
+                setAmountReceived('');
+                setTipAmount('0');
+                setSelectedPaymentMethod(null);
+            };            const finalizeSplitPayment = async (payerIndex) => {
+                const payer = payers[payerIndex];
+                if (!payer.paymentMethod) return alert('Select payment method!');
+                if (payer.items.length === 0) return alert('No items!');
+
+                const billTotal = getTotal(payer.items);
+                const tip = parseFloat(payer.tip) || 0;
+                const total = billTotal + tip;
+                const received = parseFloat(payer.amountReceived) || 0;
+
+                if (payer.paymentMethod === 'Cash' && received < total) {
+                    return alert(`Need R${total.toFixed(2)}`);
+                }
+                const change = payer.paymentMethod === 'Cash' ? received - total : 0;
+
+                const sale = {
+                    id: Date.now() + payerIndex,
+                    tableName: `${selectedTable.name} (Split ${payerIndex + 1})`,
+                    waiter: selectedTable.waiter,
+                    items: [...payer.items],
+                    subtotal: billTotal,
+                    tip: tip,
+                    total: total,
+                    paymentMethod: payer.paymentMethod,
+                    timestamp: new Date().toLocaleString(),
+                    date: new Date().toISOString().split('T')[0],
+                    description: selectedTable.description
+                };
+
+                // Save everything (same as before)
+                setSales(prev => [sale, ...prev]);
+                setHistoricalSales(prev => [sale, ...prev]);
+                setWaiters(waiters.map(w => w.id === selectedTable.waiter.id ? { ...w, sales: [...w.sales, sale] } : w));
+                setInventory(inventory.map(item => {
+                    const ordered = payer.items.find(i => i.id === item.id);
+                    return ordered ? { ...item, stock: item.stock - ordered.quantity } : item;
+                }));
+
+                // Remove paid items from table
+                const remainingOrders = selectedTable.orders
+                    .map(tableItem => {
+                        const paidItem = payer.items.find(p => p.id === tableItem.id);
+                        if (!paidItem) return tableItem;
+                        const newQty = tableItem.quantity - paidItem.quantity;
+                        return newQty > 0 ? { ...tableItem, quantity: newQty } : null;
+                    })
+                    .filter(Boolean);
+
+                setTables(tables.map(t => 
+                    t.id === selectedTable.id 
+                        ? { ...t, orders: remainingOrders, partiallyPaid: remainingOrders.length > 0 }
+                        : t
+                ));
+                setSelectedTable(prev => ({ ...prev, orders: remainingOrders, partiallyPaid: remainingOrders.length > 0 }));
+
+                // Mark payer as paid
+                setPayers(payers.map((p, i) => i === payerIndex ? { ...p, paid: true, locked: true } : p));
+
+                // PRINT THIS SPLIT RECEIPT WITH TIP
+                const receiptText = `
+LITTLE JUNGLE PLAYGROUND
+${new Date().toLocaleString()}
+----------------------------------------
+${sale.tableName}
+Waiter: ${sale.waiter?.name || 'N/A'}
+${sale.description ? 'Note: ' + sale.description : ''}
+----------------------------------------
+${payer.items.map(i => `${i.quantity}x ${i.name.padEnd(20)} R${(i.price * i.quantity).toFixed(2)}`).join('\n')}
+----------------------------------------
+SUBTOTAL:                R${billTotal.toFixed(2)}
+TIP:                     R${tip.toFixed(2)}
+TOTAL:                   R${total.toFixed(2)}
+${payer.paymentMethod === 'Cash' ? `Received:             R${received.toFixed(2)}\nChange:               R${change.toFixed(2)}` : ''}
+----------------------------------------
+Thank you!
+                `.trim();
+
+                await printViaNetwork(receiptText);
+
+                alert(change > 0 ? `Payer ${payerIndex + 1} paid! Change R${change.toFixed(2)}` : `Payer ${payerIndex + 1} paid!`);
+
+                if (payers.every(p => p.paid)) {
+                    setShowPaymentModal(false);
+                    setSelectedTable(null);
+                }
             };
-
-                        const finalizeSplitPayment = (payerIndex) => {
-    const payer = payers[payerIndex];
-
-    if (!payer.paymentMethod) {
-        alert('Please select payment method for this payer!');
-        return;
-    }
-    if (payer.items.length === 0) {
-        alert('This payer has no items!');
-        return;
-    }
-
-    const billTotal = getTotal(payer.items);
-    const tip = parseFloat(payer.tip) || 0;
-    const total = billTotal + tip;
-    const received = parseFloat(payer.amountReceived) || 0;
-
-    if (payer.paymentMethod === 'Cash' && received < total) {
-        alert(`Insufficient for payer ${payerIndex + 1}! Need R${total.toFixed(2)}`);
-        return;
-    }
-    const change = payer.paymentMethod === 'Cash' ? received - total : 0;
-
-    // Create sale record
-    const sale = {
-        id: Date.now() + payerIndex,
-        tableName: `${selectedTable.name} (Split ${payerIndex + 1})`,
-        waiter: selectedTable.waiter,
-        items: [...payer.items],
-        subtotal: billTotal,
-        tip: tip,
-        total: total,
-        paymentMethod: payer.paymentMethod,
-        timestamp: new Date().toLocaleString(),
-        date: new Date().toISOString().split('T')[0],
-        description: selectedTable.description
-    };
-
-    setSales(prev => [sale, ...prev]);
-    setHistoricalSales(prev => [sale, ...prev]);
-
-    setWaiters(waiters.map(w =>
-        w.id === selectedTable.waiter.id
-            ? { ...w, sales: [...w.sales, sale] }
-            : w
-    ));
-
-    // Reduce stock
-    setInventory(inventory.map(item => {
-        const ordered = payer.items.find(i => i.id === item.id);
-        return ordered ? { ...item, stock: item.stock - ordered.quantity } : item;
-    }));
-
-    // REMOVE PAID ITEMS FROM TABLE
-    const remainingOrders = selectedTable.orders
-        .map(tableItem => {
-            const paidItem = payer.items.find(p => p.id === tableItem.id);
-            if (!paidItem) return tableItem;
-            const newQty = tableItem.quantity - paidItem.quantity;
-            return newQty > 0 ? { ...tableItem, quantity: newQty } : null;
-        })
-        .filter(Boolean);
-
-    // UPDATE TABLE + MARK AS PARTIALLY PAID
-    setTables(tables.map(t =>
-        t.id === selectedTable.id
-            ? { ...t, orders: remainingOrders, partiallyPaid: true }
-            : t
-    ));
-
-    setSelectedTable(prev => ({
-        ...prev,
-        orders: remainingOrders,
-        partiallyPaid: true
-    }));
-
-    // CRITICAL: MARK THIS PAYER AS PAID AND LOCKED FOREVER
-    setPayers(payers.map((p, i) =>
-        i === payerIndex
-            ? { ...p, paid: true, locked: true }  // ← locked = cannot edit anymore
-            : p
-    ));
-
-    alert(change > 0
-        ? `Payer ${payerIndex + 1} paid! Change: R${change.toFixed(2)}`
-        : `Payer ${payerIndex + 1} paid successfully!`
-    );
-
-    // ←←← ADD THESE TWO LINES HERE ←←←
-    // Print receipt for this specific payer automatically
-    printPayerBill(payer, payerIndex + 1);
-
-    // Auto-close modal only when ALL payers are paid
-    if (payers.every(p => p.paid)) {
-        setShowPaymentModal(false);
-        setSelectedTable(null);
-    }
-};
 
             const finalizeDayCashUp = () => {
     // CHECK IF ALL TABLES ARE CLOSED
@@ -2232,6 +2247,7 @@ Tips   R${wtip.toFixed(2)}
 </body>
 
 </html>
+
 
 
 
