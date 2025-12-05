@@ -618,13 +618,13 @@ ${selectedPaymentMethod === 'Cash' ? `Received:             R${received.toFixed(
 Thank you! Come again!
                 `.trim();
 
-                await printViaNetwork(receiptText);
+                const success = await printViaNetwork(receiptText);
 
                 // Fallback if printer fails
-                if (!(await printViaNetwork(receiptText))) {
-                    alert('Printer not responding – opening print window');
+                if (!success) {
+                    alert('Printer not responding – opening browser print window');
                     const win = window.open('', '_blank');
-                    win.document.write(`<pre style="font-family:monospace">${receiptText}</pre>`);
+                    win.document.write(`<pre style="font-family:monospace; white-space: pre-wrap;">${receiptText}</pre>`);
                     win.document.close();
                     win.print();
                 }
@@ -2248,6 +2248,7 @@ Tips   R${wtip.toFixed(2)}
 </body>
 
 </html>
+
 
 
 
