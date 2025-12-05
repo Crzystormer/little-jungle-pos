@@ -381,7 +381,7 @@
 
             const printViaNetwork = async (content) => {
     try {
-        const address = 'http://192.168.0.163/cgi-bin/epos/service.cgi?devid=local_printer&timeout=30000';
+        const address = 'http://192.168.0.163/cgi-bin/epos/service.cgi?devid=local_printer&timeout=60000';
         const printer = new epson.ePOSPrint(address);
 
         const builder = new epson.ePOSBuilder();
@@ -389,14 +389,26 @@
         builder.addTextFont(builder.FONT_A);
         builder.addTextSize(1, 1);
         builder.addText(content);
-        builder.addCut(builder.CUT_FEED);
 
-        printer.open();
-        printer.send(builder.toString());
-        printer.close();
+        // ---- THIS IS THE IMPORTANT PART ----
+        builder.addText('\n\n\n\n');           // 4 blank lines = ~15–20 mm of feed
+        builder.addCut(builder.CUT_FEED);      // or CUT_NO_FEED if you prefer
+        // ------------------------------------
 
-        console.log('Printed to receipt printer');
+        // Wait for the actual response from the printer
+        await new Promise((resolve, reject) => {
+            printer.send(builder.toString(), (response) => {
+                if (response && response.success) {
+                    resolve(true);
+                } else {
+                    reject(new Error(response ? response.code : 'No response'));
+                }
+            });
+        });
+
+        console.log('Printed and cut successfully');
         return true;
+
     } catch (error) {
         console.error('Printer error:', error);
         alert('Could not print to receipt printer – opening browser print instead');
@@ -599,34 +611,45 @@
                 ));
 
                 // PRINT RECEIPT WITH TIP
-                const receiptText = `
-LITTLE JUNGLE PLAYGROUND
-${new Date().toLocaleString()}
-----------------------------------------
-${selectedTable.name}
-Waiter: ${selectedTable.waiter?.name || 'N/A'}
-${selectedTable.description ? 'Note: ' + selectedTable.description : ''}
-----------------------------------------
-${selectedTable.orders.map(i => `${i.quantity}x ${i.name.padEnd(20)} R${(i.price * i.quantity).toFixed(2)}`).join('\n')}
-----------------------------------------
-SUBTOTAL:                R${billTotal.toFixed(2)}
-TIP:                     R${tip.toFixed(2)}
-TOTAL:                   R${total.toFixed(2)}
-${selectedPaymentMethod === 'Cash' ? `Received:             R${received.toFixed(2)}\nChange:               R${change.toFixed(2)}` : ''}
-----------------------------------------
-Thank you! Come again!
-                `.trim();
+               const receiptText = `
+       LITTLE JUNGLE PLAYGROUND     
+        www.littlejungle.co.za     
+          Tel: 066 287 4686
 
-                await printViaNetwork(receiptText);
+${new Date().toLocaleString('en-ZA', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
 
-                // Fallback if printer fails
-                if (!(await printViaNetwork(receiptText))) {
-                    alert('Printer not responding – opening print window');
-                    const win = window.open('', '_blank');
-                    win.document.write(`<pre style="font-family:monospace">${receiptText}</pre>`);
-                    win.document.close();
-                    win.print();
-                }
+    ══════════════════════════════════════
+Table : ${selectedTable.name.padEnd(26)}
+Waiter: ${(selectedTable.waiter?.name || 'N/A').padEnd(26)}
+${selectedTable.description ? 'Note  : ' + selectedTable.description.padEnd(26) : ''}
+
+    ──────────────────────────────────────
+${selectedTable.orders.map(i => 
+  `${(i.quantity + 'x').padEnd(4)} ${i.name.padEnd(22)} R${(i.price * i.quantity).toFixed(2).padStart(7)}`
+).join('\n')}
+    ──────────────────────────────────────
+SUBTOTAL                       R ${billTotal.toFixed(2).padStart(8)}
+TIP                            R ${tip.toFixed(2).padStart(8)}
+
+    ══════════════════════════════════════
+TOTAL                          R ${total.toFixed(2).padStart(8)}
+
+    ══════════════════════════════════════
+${selectedPaymentMethod === 'Cash' ? 
+  `Received                       R ${received.toFixed(2).padStart(8)}\nChange                         R ${change.toFixed(2).padStart(8)}` : ''}
+
+        Thank you! Paid in full.
+`.trim() + '\n\n\n\n';
+
+                const success = await printViaNetwork(receiptText);
+
+if (!success) {
+    alert('Printer not responding – opening print window');
+    const win = window.open('', '_blank');
+    win.document.write(`<pre style="font-family:monospace">${receiptText}</pre>`);
+    win.document.close();
+    win.print();
+}
 
                 alert(change > 0 ? `Payment complete! Change R${change.toFixed(2)}` : 'Payment complete!');
                 setShowPaymentModal(false);
@@ -694,22 +717,35 @@ Thank you! Come again!
 
                 // PRINT THIS SPLIT RECEIPT WITH TIP
                 const receiptText = `
-LITTLE JUNGLE PLAYGROUND
-${new Date().toLocaleString()}
-----------------------------------------
-${sale.tableName}
-Waiter: ${sale.waiter?.name || 'N/A'}
-${sale.description ? 'Note: ' + sale.description : ''}
-----------------------------------------
-${payer.items.map(i => `${i.quantity}x ${i.name.padEnd(20)} R${(i.price * i.quantity).toFixed(2)}`).join('\n')}
-----------------------------------------
-SUBTOTAL:                R${billTotal.toFixed(2)}
-TIP:                     R${tip.toFixed(2)}
-TOTAL:                   R${total.toFixed(2)}
-${payer.paymentMethod === 'Cash' ? `Received:             R${received.toFixed(2)}\nChange:               R${change.toFixed(2)}` : ''}
-----------------------------------------
-Thank you!
-                `.trim();
+       LITTLE JUNGLE PLAYGROUND     
+        www.littlejungle.co.za     
+          Tel: 066 287 4686
+
+${new Date().toLocaleString('en-ZA', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+
+    ══════════════════════════════════════
+Table : ${sale.tableName.padEnd(26)}
+Waiter: ${(sale.waiter?.name || 'N/A').padEnd(26)}
+${sale.description ? 'Note  : ' + sale.description.padEnd(26) : ''}
+
+    ──────────────────────────────────────
+${payer.items.map(i => 
+  `${(i.quantity + 'x').padEnd(4)} ${i.name.padEnd(22)} R${(i.price * i.quantity).toFixed(2).padStart(7)}`
+).join('\n')}
+    ──────────────────────────────────────
+SUBTOTAL                       R ${billTotal.toFixed(2).padStart(8)}
+TIP                            R ${tip.toFixed(2).padStart(8)}
+
+    ══════════════════════════════════════
+TOTAL                          R ${total.toFixed(2).padStart(8)}
+
+    ══════════════════════════════════════
+${payer.paymentMethod === 'Cash' ? 
+  `Received                       R ${received.toFixed(2).padStart(8)}\nChange                         R ${change.toFixed(2).padStart(8)}` : 
+  `Paid by ${payer.paymentMethod}`}
+
+        Thank you! Paid in full.
+`.trim() + '\n\n\n\n';  // extra lines + cut
 
                 await printViaNetwork(receiptText);
 
@@ -788,47 +824,45 @@ Thank you!
             };
 
             const printBill = async (table) => {
-                const textContent = `
-Little Jungle Playground
-${new Date().toLocaleString()}
-----------------------------
-${table.name}
-Waiter: ${table.waiter?.name || 'N/A'}
-${table.description ? `Note: ${table.description}\n` : ''}----------------------------
-${table.orders.map(item => `${item.quantity}x ${item.name.padEnd(15)} R${(item.price * item.quantity).toFixed(2)}`).join('\n')}
-----------------------------
-TOTAL: R${getTotal(table.orders).toFixed(2)}
-----------------------------
-Thank you for visiting!
-                `;
+    const subtotal = getTotal(table.orders).toFixed(2);
 
-                const success = await printViaNetwork(textContent);
-                if (!success) {
-                    const billWindow = window.open('', '_blank');
-                    billWindow.document.write(`
-                        <!DOCTYPE html>
-                        <html><head><title>Bill</title><style>
-                            body{font-family:monospace;padding:20px;max-width:300px;margin:0 auto}
-                            h1{text-align:center;font-size:18px}
-                            .item{display:flex;justify-content:space-between;margin:5px 0}
-                        </style></head><body>
-                        <h1>Little Jungle Playground</h1>
-                        <p>${new Date().toLocaleString()}</p>
-                        <p><strong>${table.name}</strong></p>
-                        <p>Waiter: ${table.waiter?.name || 'N/A'}</p>
-                        ${table.description ? `<p>Note: ${table.description}</p>` : ''}
-                        <hr>
-                        ${table.orders.map(item => `<div class="item"><span>${item.quantity}x ${item.name}</span><span>R${(item.price * item.quantity).toFixed(2)}</span></div>`).join('')}
-                        <hr>
-                        <div class="item"><strong>TOTAL:</strong><strong>R${getTotal(table.orders).toFixed(2)}</strong></div>
-                        <p style="text-align:center;margin-top:20px">Thank you!</p>
-                        <button onclick="window.close()" style="display:block;margin:20px auto;padding:10px 20px;background:#007bff;color:white;border:none;border-radius:5px;cursor:pointer;">Close</button>
-                        </body></html>
-                    `);
-                    billWindow.document.close();
-                    setTimeout(() => billWindow.print(), 250);
-                }
-            };
+    const receiptText = `
+       LITTLE JUNGLE PLAYGROUND     
+        www.littlejungle.co.za     
+          Tel: 066 287 4686
+
+${new Date().toLocaleString('en-ZA', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+
+    ══════════════════════════════════════
+Table : ${table.name.padEnd(26)}
+Waiter: ${(table.waiter?.name || 'N/A').padEnd(26)}
+${table.description ? 'Note  : ' + table.description.padEnd(26) : ''}
+
+    ──────────────────────────────────────
+${table.orders.map(i => 
+  `${(i.quantity + 'x').padEnd(4)} ${i.name.padEnd(22)} R${(i.price * i.quantity).toFixed(2).padStart(7)}`
+).join('\n')}
+    ──────────────────────────────────────
+SUBTOTAL                       R ${subtotal.padStart(8)}
+
+TIP      _________________     R __________
+
+    ══════════════════════════════════════
+TOTAL                          R __________
+
+    ══════════════════════════════════════
+
+        Thank you! Come again soon!
+`.trim() + '\n\n\n\n';   // extra lines for clean cut
+
+    const success = await printViaNetwork(receiptText);
+    if (!success) {
+        const win = window.open('', '_blank');
+        win.document.write(`<pre style="font-family: monospace; font-size: 11px;">${receiptText}</pre>`);
+        win.document.close();
+        win.print();
+    }
+};
 
             const printSplitBill = async (sale, splitNumber) => {
                 const textContent = `
