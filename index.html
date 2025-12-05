@@ -381,7 +381,7 @@
 
             const printViaNetwork = async (content) => {
     try {
-        const address = 'http://192.168.0.163/cgi-bin/epos/service.cgi?devid=local_printer&timeout=30000';
+        const address = 'http://192.168.0.163/cgi-bin/epos/service.cgi?devid=local_printer&timeout=60000';
         const printer = new epson.ePOSPrint(address);
 
         const builder = new epson.ePOSBuilder();
@@ -389,6 +389,7 @@
         builder.addTextFont(builder.FONT_A);
         builder.addTextSize(1, 1);
         builder.addText(content);
+		builder.addText('\n\n\n\n');
         builder.addCut(builder.CUT_FEED);
 
         printer.open();
@@ -2247,6 +2248,7 @@ Tips   R${wtip.toFixed(2)}
 </body>
 
 </html>
+
 
 
 
