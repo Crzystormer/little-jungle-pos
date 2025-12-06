@@ -378,36 +378,31 @@
             const PRINTER_PORT = 80;
 
             const printViaNetwork = async (content) => {
-    if (typeof epson === 'undefined') {
-        console.warn('Epson SDK not loaded');
-        return false;
-    }
-
-    let printer;
     try {
         const address = 'http://192.168.0.163/cgi-bin/epos/service.cgi?devid=local_printer&timeout=60000';
-        printer = new epson.ePOSPrint(address);
+        const printer = new epson.ePOSPrint(address);
 
         const builder = new epson.ePOSBuilder();
         builder.addTextAlign(builder.ALIGN_CENTER);
-        builder.addTextSize(2, 2);
-        builder.addText('LITTLE JUNGLE PLAYGROUND\n');
+        builder.addTextFont(builder.FONT_A);
         builder.addTextSize(1, 1);
-        builder.addText('\n');
         builder.addText(content);
-        builder.addText('\n\n\n\n');
+
+		// ---- THIS IS THE IMPORTANT PART ----
+        builder.addText('\n\n\n\n');           // 4 blank lines = ~15–20 mm of feed
+        builder.addCut(builder.CUT_FEED);      // or CUT_NO_FEED if you prefer
+        // ------------------------------------
+
         builder.addCut(builder.CUT_FEED);
 
-        await printer.open();
-        await printer.send(builder);   // No callback, no result check → works 100%
-        await printer.close();
+        printer.open();
+        printer.send(builder.toString());
+        printer.close();
 
-        console.log('Printed successfully on TM-T20II');
-        return true;  // Success → no alert, no browser print
-
-    } catch (err) {
-        console.error('Printer failed:', err);
-        if (printer) await printer.close().catch(() => {});
+        console.log('Printed to receipt printer');
+        return true;
+    } catch (error) {
+        console.error('Printer error:', error);
         alert('Could not print to receipt printer – opening browser print instead');
         return false;
     }
@@ -2289,6 +2284,7 @@ Tips   R${wtip.toFixed(2)}
 </body>
 
 </html>
+
 
 
 
