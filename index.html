@@ -129,94 +129,96 @@
             };
 
             const [inventory, setInventory] = useState(() => loadFromStorage('inventory', [
-                { id: 63, name: 'Americano', category: 'Drinks', price: 28, stock: 30 },
-                { id: 66, name: 'Appletizer', category: 'Drinks', price: 25, stock: 30 },
-                { id: 6, name: 'Bacon & Cheese', category: 'Food', price: 45, stock: 20 },
-                { id: 17, name: 'Bacon & Cheese Burger', category: 'Food', price: 70, stock: 15 },
-                { id: 19, name: 'Bacon, Egg & Cheese', category: 'Food', price: 55, stock: 20 },
-                { id: 8, name: 'Bacon, Egg & Cheese Pita', category: 'Food', price: 60, stock: 15 },
-                { id: 15, name: 'Bacon and Egg', category: 'Food', price: 54, stock: 20 },
-                { id: 26, name: 'Bacon', category: 'Food', price: 5, stock: 50 },
-                { id: 86, name: 'Balloon Arch', category: 'Other', price: 500, stock: 5 },
-                { id: 22, name: 'Basket', category: 'Food', price: 50, stock: 20 },
-                { id: 85, name: 'Bee Teddies', category: 'Other', price: 100, stock: 20 },
-                { id: 3, name: 'Beef Burger & Chips', category: 'Food', price: 60, stock: 20 },
-				{ id: 40, name: 'Burger Combo', category: 'Food', price: 75, stock: 15 },
-				{ id: 5, name: 'Breakfast Bun + Chips', category: 'Food', price: 50, stock: 20 },
-                { id: 51, name: 'Cappuccino Cream', category: 'Drinks', price: 35, stock: 25 },
-                { id: 54, name: 'Cappuccino Foam', category: 'Drinks', price: 30, stock: 25 },
-                { id: 20, name: 'Cheese & Tomato', category: 'Food', price: 40, stock: 20 },
-                { id: 11, name: 'Cheese', category: 'Food', price: 35, stock: 30 },
-                { id: 10, name: 'Cheese Slice', category: 'Food', price: 5, stock: 50 },
-                { id: 35, name: 'Chicken Mayo', category: 'Food', price: 60, stock: 20 },
-                { id: 18, name: 'Chicken Mayo Pita', category: 'Food', price: 60, stock: 15 },
-                { id: 13, name: 'Chicken Strip Burger', category: 'Food', price: 55, stock: 20 },
-                { id: 32, name: 'Chicken Strips & Chips', category: 'Food', price: 55, stock: 20 },
-                { id: 7, name: 'Chicken Wrap & Chips', category: 'Food', price: 70, stock: 15 },
-                { id: 83, name: 'Coloring Page + Crayons', category: 'Other', price: 10, stock: 50 },
-                { id: 2, name: 'Cocktail Sausages & Chips', category: 'Food', price: 48, stock: 20 },
-                { id: 29, name: 'Donut', category: 'Food', price: 20, stock: 30 },
-                { id: 27, name: 'Elephant Breakfast', category: 'Food', price: 65, stock: 15 },
-                { id: 50, name: 'Energade', category: 'Drinks', price: 25, stock: 35 },
-                { id: 87, name: 'Entertainment Small', category: 'Other', price: 150, stock: 10 },
-                { id: 88, name: 'Entertainment Large', category: 'Other', price: 250, stock: 10 },
-				{ id: 77, name: 'Entrance Midweek', category: 'Packages', price: 80, stock: 50 },
-                { id: 78, name: 'Entrance Weekend', category: 'Packages', price: 100, stock: 50 },
-                { id: 55, name: 'Espresso - Single', category: 'Drinks', price: 20, stock: 30 },
-                { id: 48, name: 'Espresso - Double', category: 'Drinks', price: 28, stock: 30 },
-                { id: 16, name: 'Extra', category: 'Food', price: 5, stock: 50 },
-                { id: 82, name: 'Face Paint', category: 'Other', price: 20, stock: 30 },
-                { id: 37, name: 'Flapjack', category: 'Food', price: 35, stock: 25 },
-                { id: 60, name: 'Filter Coffee', category: 'Drinks', price: 25, stock: 30 },
-                { id: 33, name: 'Fish Fingers', category: 'Food', price: 40, stock: 20 },
-                { id: 12, name: 'Flat White', category: 'Drinks', price: 30, stock: 20 },
-                { id: 43, name: 'FREE SLUSH PUPPY', category: 'Drinks', price: 0, stock: 50 },
-                { id: 71, name: 'FREE POPCORN', category: 'Snacks', price: 0, stock: 100 },
-                { id: 58, name: 'Grapetizer', category: 'Drinks', price: 25, stock: 30 },
-                { id: 39, name: 'Ham & Cheese', category: 'Food', price: 40, stock: 20 },
-                { id: 36, name: 'Ham, Cheese & Tomato', category: 'Food', price: 45, stock: 20 },
-                { id: 24, name: 'Ham, Cheese & Tomato Pita', category: 'Food', price: 50, stock: 20 },
-                { id: 84, name: 'Helium Balloons', category: 'Other', price: 0, stock: 100 },
-                { id: 56, name: 'Hot Chocolate', category: 'Drinks', price: 30, stock: 30 },
-                { id: 38, name: 'Hotdog', category: 'Food', price: 35, stock: 25 },
-                { id: 47, name: 'Ice Tea', category: 'Drinks', price: 20, stock: 35 },
-                { id: 30, name: 'Ice Cream In A Cup', category: 'Food', price: 15, stock: 40 },
-                { id: 9, name: 'Ice Cream Scoop', category: 'Food', price: 5, stock: 50 },
-                { id: 21, name: 'Kiddies Breakfast', category: 'Food', price: 35, stock: 25 },
-                { id: 44, name: 'Latte', category: 'Drinks', price: 30, stock: 30 },
-                { id: 23, name: 'Legends Lunch', category: 'Food', price: 90, stock: 15 },
-                { id: 61, name: 'Liqui Fruit', category: 'Drinks', price: 25, stock: 35 },
-                { id: 65, name: 'Liqui Fruit Juice Box', category: 'Drinks', price: 15, stock: 50 },
-                { id: 34, name: 'MEAL SPECIAL', category: 'Food', price: 65, stock: 20 },
-                { id: 67, name: 'Milo', category: 'Drinks', price: 30, stock: 30 },
-                { id: 59, name: 'Milkshake Large', category: 'Drinks', price: 55, stock: 20 },
-                { id: 45, name: 'Milkshake Small', category: 'Drinks', price: 50, stock: 25 },
                 { id: 1, name: 'Monkey Breakfast', category: 'Food', price: 50, stock: 20 },
-                { id: 81, name: 'Name On The Wall', category: 'Other', price: 0, stock: 50 },
+                { id: 2, name: 'Cocktail Sausages & Chips', category: 'Food', price: 48, stock: 20 },
+                { id: 3, name: 'Beef Burger & Chips', category: 'Food', price: 60, stock: 20 },
+                { id: 4, name: 'Small Chips', category: 'Food', price: 25, stock: 30 },
+                { id: 5, name: 'Breakfast Bun + Chips', category: 'Food', price: 50, stock: 20 },
+                { id: 6, name: 'Bacon & Cheese', category: 'Food', price: 45, stock: 20 },
+                { id: 7, name: 'Chicken Wrap & Chips', category: 'Food', price: 70, stock: 15 },
+                { id: 8, name: 'Bacon, Egg & Cheese Pita', category: 'Food', price: 60, stock: 15 },
+                { id: 9, name: 'Ice Cream Scoop', category: 'Food', price: 5, stock: 50 },
+                { id: 10, name: 'Cheese Slice', category: 'Food', price: 5, stock: 50 },
+                { id: 11, name: 'Cheese', category: 'Food', price: 35, stock: 30 },
+                { id: 12, name: 'Flat White', category: 'Drinks', price: 30, stock: 20 },
+                { id: 13, name: 'Chicken Strip Burger', category: 'Food', price: 55, stock: 20 },
+                { id: 14, name: 'Chicken Mayo Toast', category: 'Food', price: 35, stock: 20 },
+                { id: 15, name: 'Bacon and Egg', category: 'Food', price: 54, stock: 20 },
+                { id: 16, name: 'Extra', category: 'Food', price: 5, stock: 50 },
+                { id: 17, name: 'Bacon & Cheese Burger', category: 'Food', price: 70, stock: 15 },
+                { id: 18, name: 'Chicken Mayo Pita', category: 'Food', price: 60, stock: 15 },
+                { id: 19, name: 'Bacon, Egg & Cheese', category: 'Food', price: 55, stock: 20 },
+                { id: 20, name: 'Cheese & Tomato', category: 'Food', price: 40, stock: 20 },
+                { id: 21, name: 'Kiddies Breakfast', category: 'Food', price: 35, stock: 25 },
+                { id: 22, name: 'Basket', category: 'Food', price: 50, stock: 20 },
+                { id: 23, name: 'Legends Lunch', category: 'Food', price: 90, stock: 15 },
+                { id: 24, name: 'Ham, Cheese & Tomato Pita', category: 'Food', price: 50, stock: 20 },
+                { id: 25, name: 'Vienna & Chips', category: 'Food', price: 30, stock: 25 },
+                { id: 26, name: 'Bacon', category: 'Food', price: 5, stock: 50 },
+                { id: 27, name: 'Elephant Breakfast', category: 'Food', price: 65, stock: 15 },
+                { id: 28, name: 'Platters', category: 'Food', price: 0, stock: 10 },
+                { id: 29, name: 'Donut', category: 'Food', price: 20, stock: 30 },
+                { id: 30, name: 'Ice Cream In A Cup', category: 'Food', price: 15, stock: 40 },
+                { id: 31, name: 'Sweet Flapjacks', category: 'Food', price: 40, stock: 20 },
+                { id: 32, name: 'Chicken Strips & Chips', category: 'Food', price: 55, stock: 20 },
+                { id: 33, name: 'Fish Fingers', category: 'Food', price: 40, stock: 20 },
+                { id: 34, name: 'MEAL SPECIAL', category: 'Food', price: 65, stock: 20 },
+                { id: 35, name: 'Chicken Mayo', category: 'Food', price: 55, stock: 20 },
+                { id: 36, name: 'Ham, Cheese & Tomato', category: 'Food', price: 45, stock: 20 },
+                { id: 37, name: 'Flapjack', category: 'Food', price: 35, stock: 25 },
+                { id: 38, name: 'Hotdog', category: 'Food', price: 35, stock: 25 },
+                { id: 39, name: 'Ham & Cheese', category: 'Food', price: 40, stock: 20 },
+                { id: 40, name: 'Burger Combo', category: 'Food', price: 75, stock: 15 },
+                { id: 41, name: 'TOASTIE COMBO', category: 'Food', price: 45, stock: 20 },
+                { id: 42, name: 'Sparkling Water', category: 'Drinks', price: 15, stock: 40 },
+                { id: 43, name: 'FREE SLUSH PUPPY', category: 'Drinks', price: 0, stock: 50 },
+                { id: 44, name: 'Latte', category: 'Drinks', price: 30, stock: 30 },
+                { id: 45, name: 'Milkshake Small', category: 'Drinks', price: 40, stock: 25 },
+                { id: 46, name: 'Slush Puppy', category: 'Drinks', price: 25, stock: 40 },
+                { id: 47, name: 'Ice Tea', category: 'Drinks', price: 20, stock: 35 },
+                { id: 48, name: 'Espresso - Double', category: 'Drinks', price: 28, stock: 30 },
+                { id: 49, name: 'Tea 5 Roses', category: 'Drinks', price: 26, stock: 30 },
+                { id: 50, name: 'Energade', category: 'Drinks', price: 25, stock: 35 },
+                { id: 51, name: 'Cappuccino Cream', category: 'Drinks', price: 35, stock: 25 },
+                { id: 52, name: 'Slush Puppy REFILL', category: 'Drinks', price: 20, stock: 50 },
                 { id: 53, name: 'Oros', category: 'Drinks', price: 15, stock: 40 },
+                { id: 54, name: 'Cappuccino Foam', category: 'Drinks', price: 30, stock: 25 },
+                { id: 55, name: 'Espresso - Single', category: 'Drinks', price: 20, stock: 30 },
+                { id: 56, name: 'Hot Chocolate', category: 'Drinks', price: 30, stock: 30 },
+                { id: 57, name: 'Softdrinks', category: 'Drinks', price: 20, stock: 50 },
+                { id: 58, name: 'Grapetizer', category: 'Drinks', price: 25, stock: 30 },
+                { id: 59, name: 'Milkshake Large', category: 'Drinks', price: 50, stock: 20 },
+                { id: 60, name: 'Filter Coffee', category: 'Drinks', price: 25, stock: 30 },
+                { id: 61, name: 'Liqui Fruit', category: 'Drinks', price: 25, stock: 35 },
+                { id: 62, name: 'Rhodes Juice Box', category: 'Drinks', price: 15, stock: 50 },
+                { id: 63, name: 'Americano', category: 'Drinks', price: 28, stock: 30 },
+                { id: 64, name: 'Tea Rooibos', category: 'Drinks', price: 27, stock: 30 },
+                { id: 65, name: 'Liqui Fruit Juice Box', category: 'Drinks', price: 15, stock: 50 },
+                { id: 66, name: 'Appletizer', category: 'Drinks', price: 25, stock: 30 },
+                { id: 67, name: 'Milo', category: 'Drinks', price: 30, stock: 30 },
+                { id: 68, name: 'Slush Puppy Refill', category: 'Drinks', price: 20, stock: 50 },
+                { id: 69, name: 'Still Water', category: 'Drinks', price: 15, stock: 50 },
+                { id: 70, name: 'Popcorn', category: 'Snacks', price: 5, stock: 60 },
+                { id: 71, name: 'FREE POPCORN', category: 'Snacks', price: 0, stock: 100 },
+                { id: 72, name: 'Rascals', category: 'Snacks', price: 15, stock: 40 },
+                { id: 73, name: 'School Package Option 4', category: 'Packages', price: 160, stock: 20 },
+                { id: 74, name: 'School Holiday Entrance', category: 'Packages', price: 90, stock: 50 },
                 { id: 75, name: 'Party Extras', category: 'Packages', price: 0, stock: 20 },
                 { id: 76, name: 'Party Package', category: 'Packages', price: 0, stock: 20 },
-                { id: 28, name: 'Platters', category: 'Food', price: 0, stock: 10 },
-                { id: 70, name: 'Popcorn', category: 'Snacks', price: 5, stock: 60 },
-                { id: 72, name: 'Rascals', category: 'Snacks', price: 15, stock: 40 },
-                { id: 89, name: 'R5', category: 'Other', price: 5, stock: 100 },
-                { id: 62, name: 'Rhodes Juice Box', category: 'Drinks', price: 15, stock: 50 },
-                { id: 64, name: 'Tea Rooibos', category: 'Drinks', price: 27, stock: 30 },
-                { id: 49, name: 'Tea 5 Roses', category: 'Drinks', price: 26, stock: 30 },
-                { id: 4, name: 'Small Chips', category: 'Food', price: 25, stock: 30 },
-                { id: 46, name: 'Slush Puppy', category: 'Drinks', price: 25, stock: 40 },
-                { id: 52, name: 'Slush Puppy REFILL', category: 'Drinks', price: 20, stock: 50 },
-                { id: 68, name: 'Slush Puppy Refill', category: 'Drinks', price: 20, stock: 50 },
-                { id: 57, name: 'Softdrinks', category: 'Drinks', price: 20, stock: 50 },
-                { id: 42, name: 'Sparkling Water', category: 'Drinks', price: 15, stock: 40 },
-                { id: 69, name: 'Still Water', category: 'Drinks', price: 15, stock: 50 },
-                { id: 31, name: 'Sweet Flapjacks', category: 'Food', price: 40, stock: 20 },
-                { id: 41, name: 'TOASTIE COMBO', category: 'Food', price: 45, stock: 20 },
-                { id: 73, name: 'School Package Option 4', category: 'Packages', price: 160, stock: 20 },
+                { id: 77, name: 'Entrance Midweek', category: 'Packages', price: 80, stock: 50 },
+                { id: 78, name: 'Entrance Weekend', category: 'Packages', price: 100, stock: 50 },
                 { id: 79, name: 'School Package Option 1', category: 'Packages', price: 85, stock: 30 },
-                { id: 74, name: 'School Holiday Entrance', category: 'Packages', price: 90, stock: 50 },
                 { id: 80, name: 'Venue', category: 'Other', price: 0, stock: 10 },
-                { id: 25, name: 'Vienna & Chips', category: 'Food', price: 30, stock: 25 },
+                { id: 81, name: 'Name On The Wall', category: 'Other', price: 0, stock: 50 },
+                { id: 82, name: 'Face Paint', category: 'Other', price: 20, stock: 30 },
+                { id: 83, name: 'Coloring Page + Crayons', category: 'Other', price: 10, stock: 50 },
+                { id: 84, name: 'Helium Balloons', category: 'Other', price: 0, stock: 100 },
+                { id: 85, name: 'Bee Teddies', category: 'Other', price: 100, stock: 20 },
+                { id: 86, name: 'Balloon Arch', category: 'Other', price: 500, stock: 5 },
+                { id: 87, name: 'Entertainment Small', category: 'Other', price: 150, stock: 10 },
+                { id: 88, name: 'Entertainment Large', category: 'Other', price: 250, stock: 10 },
+                { id: 89, name: 'R5', category: 'Other', price: 5, stock: 100 },
+                { id: 90, name: 'Chicken Mayo Toast ONLY', category: 'Food', price: 35, stock: 50 },
             ]));
 
            const [tables, setTables] = useState(() => loadFromStorage('tables', 
@@ -379,7 +381,7 @@
 
             const printViaNetwork = async (content) => {
     try {
-        const address = 'http://192.168.0.163/cgi-bin/epos/service.cgi?devid=local_printer&timeout=60000';
+        const address = 'http://192.168.0.163/cgi-bin/epos/service.cgi?devid=local_printer&timeout=30000';
         const printer = new epson.ePOSPrint(address);
 
         const builder = new epson.ePOSBuilder();
@@ -387,26 +389,14 @@
         builder.addTextFont(builder.FONT_A);
         builder.addTextSize(1, 1);
         builder.addText(content);
+        builder.addCut(builder.CUT_FEED);
 
-        // ---- THIS IS THE IMPORTANT PART ----
-        builder.addText('\n\n\n\n');           // 4 blank lines = ~15–20 mm of feed
-        builder.addCut(builder.CUT_FEED);      // or CUT_NO_FEED if you prefer
-        // ------------------------------------
+        printer.open();
+        printer.send(builder.toString());
+        printer.close();
 
-        // Wait for the actual response from the printer
-        await new Promise((resolve, reject) => {
-            printer.send(builder.toString(), (response) => {
-                if (response && response.success) {
-                    resolve(true);
-                } else {
-                    reject(new Error(response ? response.code : 'No response'));
-                }
-            });
-        });
-
-        console.log('Printed and cut successfully');
+        console.log('Printed to receipt printer');
         return true;
-
     } catch (error) {
         console.error('Printer error:', error);
         alert('Could not print to receipt printer – opening browser print instead');
@@ -610,49 +600,35 @@
 
                 // PRINT RECEIPT WITH TIP
                 const receiptText = `
-       LITTLE JUNGLE PLAYGROUND      
-     www.littlejungle.co.za     
-     Tel: 066 287 4686        
-
-${new Date().toLocaleDateString('en-GB', {
-  weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
-})}, ${new Date().toLocaleTimeString('en-ZA', {
-  hour: '2-digit', minute: '2-digit'
-})}
-
-${'='.repeat(40)}
-Table : ${selectedTable.name}
+LITTLE JUNGLE PLAYGROUND
+${new Date().toLocaleString()}
+----------------------------------------
+${selectedTable.name}
 Waiter: ${selectedTable.waiter?.name || 'N/A'}
+${selectedTable.description ? 'Note: ' + selectedTable.description : ''}
+----------------------------------------
+${selectedTable.orders.map(i => `${i.quantity}x ${i.name.padEnd(20)} R${(i.price * i.quantity).toFixed(2)}`).join('\n')}
+----------------------------------------
+SUBTOTAL:                R${billTotal.toFixed(2)}
+TIP:                     R${tip.toFixed(2)}
+TOTAL:                   R${total.toFixed(2)}
+${selectedPaymentMethod === 'Cash' ? `Received:             R${received.toFixed(2)}\nChange:               R${change.toFixed(2)}` : ''}
+----------------------------------------
+Thank you! Come again!
+                `.trim();
 
-${selectedTable.orders.map(item => 
-  `${item.quantity}x  ${item.name.padEnd(26)} R ${String(item.price * item.quantity).padStart(6)}.00`
-).join('\n')}
-${'─'.repeat(40)}
-SUBTOTAL                            R ${String(billTotal.toFixed(2)).padStart(8)}
+                await printViaNetwork(receiptText);
 
-TIP                                 R ${tip > 0 ? String(tip.toFixed(2)).padStart(8) : '0.00'}
+                // Fallback if printer fails
+                if (!(await printViaNetwork(receiptText))) {
+                    alert('Printer not responding – opening print window');
+                    const win = window.open('', '_blank');
+                    win.document.write(`<pre style="font-family:monospace">${receiptText}</pre>`);
+                    win.document.close();
+                    win.print();
+                }
 
-TOTAL                               R ${String(total.toFixed(2)).padStart(8)}
-
-${selectedPaymentMethod === 'Cash' ? 
-`Received                            R ${received.toFixed(2).padStart(8)}
-Change                              R ${change.toFixed(2).padStart(8)}` : ''}
-
-Thank you! Come again soon!
-`.trim();
-
-                                // Try to print to the thermal printer first
-                const success = await printViaNetwork(receiptText);
-
-if (!success) {
-    alert('Printer not responding – opening print window');
-    const win = window.open('', '_blank');
-    win.document.write(`<pre style="font-family:monospace">${receiptText}</pre>`);
-    win.document.close();
-    win.print();
-}
-
-alert(change > 0 ? `Payment complete! Change R${change.toFixed(2)}` : 'Payment complete!');
+                alert(change > 0 ? `Payment complete! Change R${change.toFixed(2)}` : 'Payment complete!');
                 setShowPaymentModal(false);
                 setSelectedTable(null);
                 setAmountReceived('');
@@ -735,15 +711,7 @@ ${payer.paymentMethod === 'Cash' ? `Received:             R${received.toFixed(2)
 Thank you!
                 `.trim();
 
-                                const success = await printViaNetwork(receiptText);
-
-                if (!success) {
-                    // fallback browser print for split receipts
-                    const win = window.open('', '_blank');
-                    win.document.write(`<pre style="font-family:monospace;">${receiptText}</pre>`);
-                    win.document.close();
-                    win.print();
-                }
+                await printViaNetwork(receiptText);
 
                 alert(change > 0 ? `Payer ${payerIndex + 1} paid! Change R${change.toFixed(2)}` : `Payer ${payerIndex + 1} paid!`);
 
@@ -820,66 +788,47 @@ Thank you!
             };
 
             const printBill = async (table) => {
-  const subtotal = table.orders.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-
-  const receiptText = `
-LITTLE JUNGLE PLAYGROUND
-www.littlejungle.co.za
-Tel: 066 287 4686
-
-${new Date().toLocaleDateString('en-GB', {
-  weekday: 'short', day: '2-digit', month: 'short', year: 'numeric'
-})}, ${new Date().toLocaleTimeString('en-ZA', {
-  hour: '2-digit', minute: '2-digit'
-})}
-
-${'='.repeat(40)}
-Table : ${table.name}
+                const textContent = `
+Little Jungle Playground
+${new Date().toLocaleString()}
+----------------------------
+${table.name}
 Waiter: ${table.waiter?.name || 'N/A'}
+${table.description ? `Note: ${table.description}\n` : ''}----------------------------
+${table.orders.map(item => `${item.quantity}x ${item.name.padEnd(15)} R${(item.price * item.quantity).toFixed(2)}`).join('\n')}
+----------------------------
+TOTAL: R${getTotal(table.orders).toFixed(2)}
+----------------------------
+Thank you for visiting!
+                `;
 
-${table.orders.map(item => 
-  `${item.quantity}x  ${item.name.padEnd(26)} R ${String(item.price * item.quantity).padStart(6)}.00`
-).join('\n')}
-${'─'.repeat(40)}
-SUBTOTAL                            R ${String(subtotal.toFixed(2)).padStart(8)}
-
-TIP                                 R -------
-
-TOTAL                               R -------
-
-Thank you! Come again soon!
-`.trim();
-
-  // This keeps your existing thermal printer support exactly as well as the fallback window
-  const success = await printViaNetwork(receiptText);
-
-  if (!success) {
-    // fallback – opens a tiny print-friendly window (same as you already had)
-    const billWindow = window.open('', '_blank');
-    billWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Bill</title>
-          <style>
-            body { font-family: monospace; padding: 20px; max-width: 300px; margin: 0 auto; font-size: 13px; }
-            pre { white-space: pre; }
-          </style>
-        </head>
-        <body>
-          <pre>${receiptText}</pre>
-          <div style="text-align:center; margin-top:30px;">
-            <button onclick="window.print(); window.close()" 
-                    style="padding:12px 24px; font-size:16px; background:#007bff; color:white; border:none; border-radius:6px; cursor:pointer;">
-              Print / Close
-            </button>
-          </div>
-        </body>
-      </html>
-    `);
-    billWindow.document.close();
-  }
-};
+                const success = await printViaNetwork(textContent);
+                if (!success) {
+                    const billWindow = window.open('', '_blank');
+                    billWindow.document.write(`
+                        <!DOCTYPE html>
+                        <html><head><title>Bill</title><style>
+                            body{font-family:monospace;padding:20px;max-width:300px;margin:0 auto}
+                            h1{text-align:center;font-size:18px}
+                            .item{display:flex;justify-content:space-between;margin:5px 0}
+                        </style></head><body>
+                        <h1>Little Jungle Playground</h1>
+                        <p>${new Date().toLocaleString()}</p>
+                        <p><strong>${table.name}</strong></p>
+                        <p>Waiter: ${table.waiter?.name || 'N/A'}</p>
+                        ${table.description ? `<p>Note: ${table.description}</p>` : ''}
+                        <hr>
+                        ${table.orders.map(item => `<div class="item"><span>${item.quantity}x ${item.name}</span><span>R${(item.price * item.quantity).toFixed(2)}</span></div>`).join('')}
+                        <hr>
+                        <div class="item"><strong>TOTAL:</strong><strong>R${getTotal(table.orders).toFixed(2)}</strong></div>
+                        <p style="text-align:center;margin-top:20px">Thank you!</p>
+                        <button onclick="window.close()" style="display:block;margin:20px auto;padding:10px 20px;background:#007bff;color:white;border:none;border-radius:5px;cursor:pointer;">Close</button>
+                        </body></html>
+                    `);
+                    billWindow.document.close();
+                    setTimeout(() => billWindow.print(), 250);
+                }
+            };
 
             const printSplitBill = async (sale, splitNumber) => {
                 const textContent = `
@@ -929,55 +878,63 @@ Thank you for visiting!
             };
 
             const printPayerBill = async (payer, splitNumber) => {
-                const billTotal = getTotal(payer.items);
-                const tip = parseFloat(payer.tip || 0);
-                const total = billTotal + tip;
+                const tempSale = {
+                    tableName: `${selectedTable.name} (Split ${splitNumber})`,
+                    waiter: selectedTable.waiter,
+                    items: [...payer.items],
+                    subtotal: getTotal(payer.items),
+                    tip: parseFloat(payer.tip || 0),
+                    total: getTotal(payer.items) + parseFloat(payer.tip || 0),
+                    paymentMethod: payer.paymentMethod || 'Pending',
+                    timestamp: new Date().toLocaleString(),
+                    date: new Date().toISOString().split('T')[0],
+                    description: selectedTable.description
+                };
+                const textContent = `
+Little Jungle Playground
+${new Date().toLocaleString()}
+----------------------------
+${tempSale.tableName}
+Waiter: ${tempSale.waiter?.name || 'N/A'}
+${tempSale.description ? `Note: ${tempSale.description}\n` : ''}----------------------------
+${tempSale.items.map(item => `${item.quantity}x ${item.name.padEnd(15)} R${(item.price * item.quantity).toFixed(2)}`).join('\n')}
+----------------------------
+SUBTOTAL: R${tempSale.subtotal.toFixed(2)}
+TIP: R${tempSale.tip.toFixed(2)}
+TOTAL: R${tempSale.total.toFixed(2)}
+----------------------------
+Payment: ${tempSale.paymentMethod}
+Thank you for visiting!
+                `;
 
-                const receiptText = `
-       LITTLE JUNGLE PLAYGROUND     
-        www.littlejungle.co.za     
-          Tel: 066 287 4686
-
-${new Date().toLocaleString('en-ZA', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-
-    ══════════════════════════════════════
-Table : ${selectedTable.name} (Split ${splitNumber})${' '.padEnd(15 - String(splitNumber).length)}
-Waiter: ${(selectedTable.waiter?.name || 'N/A').padEnd(26)}
-${selectedTable.description ? 'Note  : ' + selectedTable.description.padEnd(26) : ''}
-
-    ──────────────────────────────────────
-${payer.items.map(i => 
-  `${(i.quantity + 'x').padEnd(4)} ${i.name.padEnd(22)} R${(i.price * i.quantity).toFixed(2).padStart(7)}`
-).join('\n')}
-    ──────────────────────────────────────
-SUBTOTAL                       R ${billTotal.toFixed(2).padStart(8)}
-TIP                            R ${tip.toFixed(2).padStart(8)}
-
-    ══════════════════════════════════════
-TOTAL                          R ${total.toFixed(2).padStart(8)}
-
-    ══════════════════════════════════════
-${payer.paymentMethod ? 
-  (payer.paymentMethod === 'Cash' 
-    ? `Received                       R ${(parseFloat(payer.amountReceived) || 0).toFixed(2).padStart(8)}\nChange                         R ${(parseFloat(payer.amountReceived) - total).toFixed(2).padStart(8)}`
-    : `Paid by ${payer.paymentMethod.padEnd(25)}`
-  ) : 'Payment pending'}
-
-        Thank you!${payer.paid ? ' Paid in full.' : ''}
-`.trim() + '\n\n\n\n\n'; // extra feed + cut
-
-                const success = await printViaNetwork(receiptText);
-
+                const success = await printViaNetwork(textContent);
                 if (!success) {
-                    alert('Printer not responding – opening print window');
-                    const win = window.open('', '_blank');
-                    win.document.write(`
-                        <pre style="font-family: monospace; font-size: 11px; line-height: 1.3; margin: 0;">
-${receiptText}
-                        </pre>
+                    const billWindow = window.open('', '_blank');
+                    billWindow.document.write(`
+                        <!DOCTYPE html>
+                        <html><head><title>Split Bill ${splitNumber}</title><style>
+                            body{font-family:monospace;padding:20px;max-width:300px;margin:0 auto}
+                            h1{text-align:center;font-size:18px}
+                            .item{display:flex;justify-content:space-between;margin:5px 0}
+                        </style></head><body>
+                        <h1>Little Jungle Playground</h1>
+                        <p>${new Date().toLocaleString()}</p>
+                        <p><strong>${tempSale.tableName}</strong></p>
+                        <p>Waiter: ${tempSale.waiter?.name || 'N/A'}</p>
+                        ${tempSale.description ? `<p>Note: ${tempSale.description}</p>` : ''}
+                        <hr>
+                        ${tempSale.items.map(item => `<div class="item"><span>${item.quantity}x ${item.name}</span><span>R${(item.price * item.quantity).toFixed(2)}</span></div>`).join('')}
+                        <hr>
+                        <div class="item"><strong>SUBTOTAL:</strong><strong>R${tempSale.subtotal.toFixed(2)}</strong></div>
+                        <div class="item"><strong>TIP:</strong><strong>R${tempSale.tip.toFixed(2)}</strong></div>
+                        <div class="item"><strong>TOTAL:</strong><strong>R${tempSale.total.toFixed(2)}</strong></div>
+                        <div class="item"><strong>Payment:</strong><strong>${tempSale.paymentMethod}</strong></div>
+                        <p style="text-align:center;margin-top:20px">Thank you!</p>
+                        <button onclick="window.close()" style="display:block;margin:20px auto;padding:10px 20px;background:#007bff;color:white;border:none;border-radius:5px;cursor:pointer;">Close</button>
+                        </body></html>
                     `);
-                    win.document.close();
-                    win.print();
+                    billWindow.document.close();
+                    setTimeout(() => billWindow.print(), 250);
                 }
             };
 
@@ -2290,7 +2247,5 @@ Tips   R${wtip.toFixed(2)}
 </body>
 
 </html>
-
-
 
 
