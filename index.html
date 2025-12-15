@@ -81,6 +81,8 @@
             const [amountReceived, setAmountReceived] = useState('');
             const [tipAmount, setTipAmount] = useState('0');
             const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
+			const [cashAmount, setCashAmount] = useState('');
+			const [cardAmount, setCardAmount] = useState('');
             const [dateFilter, setDateFilter] = useState({ start: '', end: '' });
 	useEffect(() => {
     if (activeTab === 'reports') {
@@ -129,97 +131,108 @@
             };
 
             const [inventory, setInventory] = useState(() => loadFromStorage('inventory', [
-                { id: 63, name: 'Americano', category: 'Drinks', price: 28, stock: 2000 },
-                { id: 66, name: 'Appletizer', category: 'Drinks', price: 25, stock: 2000 },
-                { id: 6, name: 'Bacon & Cheese', category: 'Food', price: 45, stock: 2000 },
-                { id: 17, name: 'Bacon & Cheese Burger', category: 'Food', price: 70, stock: 2000 },
-                { id: 19, name: 'Bacon, Egg & Cheese', category: 'Food', price: 55, stock: 2000 },
-                { id: 8, name: 'Bacon, Egg & Cheese Pita', category: 'Food', price: 60, stock: 2000 },
-                { id: 15, name: 'Bacon and Egg', category: 'Food', price: 55, stock: 2000 },
-                { id: 26, name: 'Bacon', category: 'Food', price: 5, stock: 2000 },
-                { id: 86, name: 'Balloon Arch', category: 'Other', price: 500, stock: 2000 },
-                { id: 22, name: 'Basket', category: 'Food', price: 50, stock: 2000 },
-                { id: 85, name: 'Bee Teddies', category: 'Other', price: 100, stock: 2000 },
-                { id: 3, name: 'Beef Burger & Chips', category: 'Food', price: 60, stock: 2000 },
-				{ id: 40, name: 'Burger Combo', category: 'Food', price: 75, stock: 2000 },
-				{ id: 91, name: 'Breakfast Burger + Chips', category: 'Food', price: 70, stock: 2000 },
-                { id: 51, name: 'Cappuccino Cream', category: 'Drinks', price: 35, stock: 2000 },
-                { id: 54, name: 'Cappuccino Foam', category: 'Drinks', price: 30, stock: 2000 },
-                { id: 20, name: 'Cheese & Tomato', category: 'Food', price: 40, stock: 2000 },
-                { id: 11, name: 'Cheese', category: 'Food', price: 35, stock: 2000 },
-                { id: 10, name: 'Cheese Slice', category: 'Food', price: 5, stock: 2000 },
-                { id: 35, name: 'Chicken Mayo', category: 'Food', price: 60, stock: 2000 },
-                { id: 18, name: 'Chicken Mayo Pita', category: 'Food', price: 60, stock: 2000 },
-                { id: 13, name: 'Chicken Strip Burger', category: 'Food', price: 55, stock: 2000 },
-                { id: 32, name: 'Chicken Strips & Chips', category: 'Food', price: 55, stock: 2000 },
-                { id: 7, name: 'Chicken Wrap & Chips', category: 'Food', price: 70, stock: 2000 },
-                { id: 83, name: 'Coloring Page + Crayons', category: 'Other', price: 10, stock: 2000 },
-                { id: 2, name: 'Cocktail Sausages & Chips', category: 'Food', price: 48, stock: 2000 },
-                { id: 29, name: 'Donut', category: 'Food', price: 20, stock: 2000 },
-                { id: 27, name: 'Elephant Breakfast', category: 'Food', price: 65, stock: 2000 },
-                { id: 50, name: 'Energade', category: 'Drinks', price: 25, stock: 2000 },
-                { id: 87, name: 'Entertainment Small', category: 'Other', price: 150, stock: 2000 },
-                { id: 88, name: 'Entertainment Large', category: 'Other', price: 250, stock: 2000 },
-				{ id: 77, name: 'Entrance Midweek', category: 'Packages', price: 80, stock: 2000 },
-                { id: 78, name: 'Entrance Weekend', category: 'Packages', price: 100, stock: 2000 },
-                { id: 55, name: 'Espresso - Single', category: 'Drinks', price: 20, stock: 2000 },
-                { id: 48, name: 'Espresso - Double', category: 'Drinks', price: 28, stock: 2000 },
-                { id: 16, name: 'Extra', category: 'Food', price: 5, stock: 2000 },
-                { id: 82, name: 'Face Paint', category: 'Other', price: 20, stock: 2000 },
-                { id: 37, name: 'Flapjack', category: 'Food', price: 35, stock: 2000 },
-                { id: 60, name: 'Filter Coffee', category: 'Drinks', price: 25, stock: 2000 },
-                { id: 12, name: 'Flat White', category: 'Drinks', price: 30, stock: 2000 },
-                { id: 43, name: 'FREE SLUSH PUPPY', category: 'Drinks', price: 0, stock: 2000 },
-                { id: 71, name: 'FREE POPCORN', category: 'Snacks', price: 0, stock: 2000 },
-				{ id: 33, name: 'French Toast Fingers', category: 'Food', price: 20, stock: 2000 },
-                { id: 58, name: 'Grapetizer', category: 'Drinks', price: 25, stock: 2000 },
-                { id: 39, name: 'Ham & Cheese', category: 'Food', price: 40, stock: 2000 },
-                { id: 36, name: 'Ham, Cheese & Tomato', category: 'Food', price: 45, stock: 2000 },
-                { id: 24, name: 'Ham, Cheese & Tomato Pita', category: 'Food', price: 50, stock: 2000 },
-                { id: 84, name: 'Helium Balloons', category: 'Other', price: 0, stock: 2000 },
-                { id: 56, name: 'Hot Chocolate', category: 'Drinks', price: 30, stock: 2000 },
-                { id: 38, name: 'Hotdog', category: 'Food', price: 35, stock: 2000 },
-                { id: 47, name: 'Ice Tea', category: 'Drinks', price: 20, stock: 2000 },
-                { id: 30, name: 'Ice Cream In A Cup', category: 'Food', price: 15, stock: 2000 },
-                { id: 9, name: 'Ice Cream Scoop', category: 'Food', price: 5, stock: 2000 },
-                { id: 21, name: 'Kiddies Breakfast', category: 'Food', price: 35, stock: 2000 },
-                { id: 44, name: 'Latte', category: 'Drinks', price: 30, stock: 2000 },
-                { id: 23, name: 'Legends Lunch', category: 'Food', price: 90, stock: 2000 },
-                { id: 61, name: 'Liqui Fruit', category: 'Drinks', price: 25, stock: 2000 },
-                { id: 65, name: 'Liqui Fruit Juice Box', category: 'Drinks', price: 15, stock: 2000 },
-                { id: 34, name: 'MEAL SPECIAL', category: 'Food', price: 65, stock: 2000 },
-                { id: 67, name: 'Milo', category: 'Drinks', price: 30, stock: 2000 },
-                { id: 59, name: 'Milkshake Large', category: 'Drinks', price: 55, stock: 2000 },
-                { id: 45, name: 'Milkshake Small', category: 'Drinks', price: 50, stock: 2000 },
-                { id: 1, name: 'Monkey Breakfast', category: 'Food', price: 50, stock: 2000 },
-                { id: 81, name: 'Name On The Wall', category: 'Other', price: 0, stock: 2000 },
-				{ id: 93, name: 'No Chips', category: 'Other', price: -20, stock: 2000 },
-                { id: 53, name: 'Oros', category: 'Drinks', price: 15, stock: 2000 },
-                { id: 75, name: 'Party Extras', category: 'Packages', price: 0, stock: 2000 },
-                { id: 76, name: 'Party Package', category: 'Packages', price: 0, stock: 2000 },
-                { id: 28, name: 'Platters', category: 'Food', price: 0, stock: 2000 },
-                { id: 70, name: 'Popcorn', category: 'Snacks', price: 5, stock: 2000 },
-                { id: 89, name: 'R5', category: 'Other', price: 5, stock: 2000 },
-                { id: 62, name: 'Rhodes Juice Box', category: 'Drinks', price: 15, stock: 2000 },
-                { id: 64, name: 'Tea Rooibos', category: 'Drinks', price: 27, stock: 2000 },
-                { id: 49, name: 'Tea 5 Roses', category: 'Drinks', price: 26, stock: 2000 },
-                { id: 4, name: 'Small Chips', category: 'Food', price: 25, stock: 2000 },
-                { id: 46, name: 'Slush Puppy', category: 'Drinks', price: 25, stock: 2000 },
-                { id: 52, name: 'Slush Puppy REFILL', category: 'Drinks', price: 20, stock: 2000 },
-                { id: 57, name: 'Softdrinks', category: 'Drinks', price: 20, stock: 2000 },
-                { id: 42, name: 'Sparkling Water', category: 'Drinks', price: 15, stock: 2000 },
-                { id: 69, name: 'Still Water', category: 'Drinks', price: 15, stock: 2000 },
-                { id: 31, name: 'Sweet Flapjacks', category: 'Food', price: 40, stock: 2000 },
-                { id: 41, name: 'TOASTIE COMBO', category: 'Food', price: 45, stock: 2000 },
-                { id: 73, name: 'School Package Option 4', category: 'Packages', price: 160, stock: 2000 },
-                { id: 79, name: 'School Package Option 1', category: 'Packages', price: 85, stock: 2000 },
-                { id: 74, name: 'School Holiday Entrance', category: 'Packages', price: 90, stock: 2000 },
-                { id: 80, name: 'Venue', category: 'Other', price: 0, stock: 2000 },
-                { id: 25, name: 'Vienna & Chips', category: 'Food', price: 30, stock: 2000 },
+                { id: 63, name: 'Americano', category: 'Drinks', price: 28, stock: 30 },
+                { id: 66, name: 'Appletizer', category: 'Drinks', price: 25, stock: 30 },
+                { id: 6, name: 'Bacon & Cheese', category: 'Food', price: 45, stock: 20 },
+                { id: 17, name: 'Bacon & Cheese Burger', category: 'Food', price: 70, stock: 15 },
+                { id: 19, name: 'Bacon, Egg & Cheese', category: 'Food', price: 55, stock: 20 },
+                { id: 8, name: 'Bacon, Egg & Cheese Pita', category: 'Food', price: 60, stock: 15 },
+                { id: 15, name: 'Bacon and Egg', category: 'Food', price: 54, stock: 20 },
+                { id: 26, name: 'Bacon', category: 'Food', price: 5, stock: 50 },
+                { id: 86, name: 'Balloon Arch', category: 'Other', price: 500, stock: 5 },
+                { id: 22, name: 'Basket', category: 'Food', price: 50, stock: 20 },
+                { id: 85, name: 'Bee Teddies', category: 'Other', price: 100, stock: 20 },
+                { id: 3, name: 'Beef Burger & Chips', category: 'Food', price: 60, stock: 20 },
+				{ id: 40, name: 'Burger Combo', category: 'Food', price: 75, stock: 15 },
+				{ id: 5, name: 'Breakfast Bun + Chips', category: 'Food', price: 50, stock: 20 },
+                { id: 51, name: 'Cappuccino Cream', category: 'Drinks', price: 35, stock: 25 },
+                { id: 54, name: 'Cappuccino Foam', category: 'Drinks', price: 30, stock: 25 },
+                { id: 20, name: 'Cheese & Tomato', category: 'Food', price: 40, stock: 20 },
+                { id: 11, name: 'Cheese', category: 'Food', price: 35, stock: 30 },
+                { id: 10, name: 'Cheese Slice', category: 'Food', price: 5, stock: 50 },
+                { id: 35, name: 'Chicken Mayo', category: 'Food', price: 60, stock: 20 },
+                { id: 18, name: 'Chicken Mayo Pita', category: 'Food', price: 60, stock: 15 },
+                { id: 13, name: 'Chicken Strip Burger', category: 'Food', price: 55, stock: 20 },
+                { id: 32, name: 'Chicken Strips & Chips', category: 'Food', price: 55, stock: 20 },
+                { id: 7, name: 'Chicken Wrap & Chips', category: 'Food', price: 70, stock: 15 },
+                { id: 83, name: 'Coloring Page + Crayons', category: 'Other', price: 10, stock: 50 },
+                { id: 2, name: 'Cocktail Sausages & Chips', category: 'Food', price: 48, stock: 20 },
+                { id: 29, name: 'Donut', category: 'Food', price: 20, stock: 30 },
+                { id: 27, name: 'Elephant Breakfast', category: 'Food', price: 65, stock: 15 },
+                { id: 50, name: 'Energade', category: 'Drinks', price: 25, stock: 35 },
+                { id: 87, name: 'Entertainment Small', category: 'Other', price: 150, stock: 10 },
+                { id: 88, name: 'Entertainment Large', category: 'Other', price: 250, stock: 10 },
+				{ id: 77, name: 'Entrance Midweek', category: 'Packages', price: 80, stock: 50 },
+                { id: 78, name: 'Entrance Weekend', category: 'Packages', price: 100, stock: 50 },
+                { id: 55, name: 'Espresso - Single', category: 'Drinks', price: 20, stock: 30 },
+                { id: 48, name: 'Espresso - Double', category: 'Drinks', price: 28, stock: 30 },
+                { id: 16, name: 'Extra', category: 'Food', price: 5, stock: 50 },
+                { id: 82, name: 'Face Paint', category: 'Other', price: 20, stock: 30 },
+                { id: 37, name: 'Flapjack', category: 'Food', price: 35, stock: 25 },
+                { id: 60, name: 'Filter Coffee', category: 'Drinks', price: 25, stock: 30 },
+                { id: 33, name: 'Fish Fingers', category: 'Food', price: 40, stock: 20 },
+                { id: 12, name: 'Flat White', category: 'Drinks', price: 30, stock: 20 },
+                { id: 43, name: 'FREE SLUSH PUPPY', category: 'Drinks', price: 0, stock: 50 },
+                { id: 71, name: 'FREE POPCORN', category: 'Snacks', price: 0, stock: 100 },
+                { id: 58, name: 'Grapetizer', category: 'Drinks', price: 25, stock: 30 },
+                { id: 39, name: 'Ham & Cheese', category: 'Food', price: 40, stock: 20 },
+                { id: 36, name: 'Ham, Cheese & Tomato', category: 'Food', price: 45, stock: 20 },
+                { id: 24, name: 'Ham, Cheese & Tomato Pita', category: 'Food', price: 50, stock: 20 },
+                { id: 84, name: 'Helium Balloons', category: 'Other', price: 0, stock: 100 },
+                { id: 56, name: 'Hot Chocolate', category: 'Drinks', price: 30, stock: 30 },
+                { id: 38, name: 'Hotdog', category: 'Food', price: 35, stock: 25 },
+                { id: 47, name: 'Ice Tea', category: 'Drinks', price: 20, stock: 35 },
+                { id: 30, name: 'Ice Cream In A Cup', category: 'Food', price: 15, stock: 40 },
+                { id: 9, name: 'Ice Cream Scoop', category: 'Food', price: 5, stock: 50 },
+                { id: 21, name: 'Kiddies Breakfast', category: 'Food', price: 35, stock: 25 },
+                { id: 44, name: 'Latte', category: 'Drinks', price: 30, stock: 30 },
+                { id: 23, name: 'Legends Lunch', category: 'Food', price: 90, stock: 15 },
+                { id: 61, name: 'Liqui Fruit', category: 'Drinks', price: 25, stock: 35 },
+                { id: 65, name: 'Liqui Fruit Juice Box', category: 'Drinks', price: 15, stock: 50 },
+                { id: 34, name: 'MEAL SPECIAL', category: 'Food', price: 65, stock: 20 },
+                { id: 67, name: 'Milo', category: 'Drinks', price: 30, stock: 30 },
+                { id: 59, name: 'Milkshake Large', category: 'Drinks', price: 55, stock: 20 },
+                { id: 45, name: 'Milkshake Small', category: 'Drinks', price: 50, stock: 25 },
+                { id: 1, name: 'Monkey Breakfast', category: 'Food', price: 50, stock: 20 },
+                { id: 81, name: 'Name On The Wall', category: 'Other', price: 0, stock: 50 },
+                { id: 53, name: 'Oros', category: 'Drinks', price: 15, stock: 40 },
+                { id: 75, name: 'Party Extras', category: 'Packages', price: 0, stock: 20 },
+                { id: 76, name: 'Party Package', category: 'Packages', price: 0, stock: 20 },
+                { id: 28, name: 'Platters', category: 'Food', price: 0, stock: 10 },
+                { id: 70, name: 'Popcorn', category: 'Snacks', price: 5, stock: 60 },
+                { id: 72, name: 'Rascals', category: 'Snacks', price: 15, stock: 40 },
+                { id: 89, name: 'R5', category: 'Other', price: 5, stock: 100 },
+                { id: 62, name: 'Rhodes Juice Box', category: 'Drinks', price: 15, stock: 50 },
+                { id: 64, name: 'Tea Rooibos', category: 'Drinks', price: 27, stock: 30 },
+                { id: 49, name: 'Tea 5 Roses', category: 'Drinks', price: 26, stock: 30 },
+                { id: 4, name: 'Small Chips', category: 'Food', price: 25, stock: 30 },
+                { id: 46, name: 'Slush Puppy', category: 'Drinks', price: 25, stock: 40 },
+                { id: 52, name: 'Slush Puppy REFILL', category: 'Drinks', price: 20, stock: 50 },
+                { id: 68, name: 'Slush Puppy Refill', category: 'Drinks', price: 20, stock: 50 },
+                { id: 57, name: 'Softdrinks', category: 'Drinks', price: 20, stock: 50 },
+                { id: 42, name: 'Sparkling Water', category: 'Drinks', price: 15, stock: 40 },
+                { id: 69, name: 'Still Water', category: 'Drinks', price: 15, stock: 50 },
+                { id: 31, name: 'Sweet Flapjacks', category: 'Food', price: 40, stock: 20 },
+                { id: 41, name: 'TOASTIE COMBO', category: 'Food', price: 45, stock: 20 },
+                { id: 73, name: 'School Package Option 4', category: 'Packages', price: 160, stock: 20 },
+                { id: 79, name: 'School Package Option 1', category: 'Packages', price: 85, stock: 30 },
+                { id: 74, name: 'School Holiday Entrance', category: 'Packages', price: 90, stock: 50 },
+                { id: 80, name: 'Venue', category: 'Other', price: 0, stock: 10 },
+                { id: 25, name: 'Vienna & Chips', category: 'Food', price: 30, stock: 25 },
             ]));
 
            const [tables, setTables] = useState(() => loadFromStorage('tables', 
     [
+		// WALK-IN TABLE
+    {
+        id: 99,
+        name: 'Walk-In',
+        status: 'available',
+        orders: [],
+        waiter: null,
+        description: '',
+        partiallyPaid: false
+    },
         // MAIN AREA (1-13)
         ...Array.from({length: 13}, (_, i) => ({
             id: i + 1,
@@ -273,6 +286,15 @@
             useEffect(() => { saveToStorage('tables', tables); }, [tables]);
             useEffect(() => { saveToStorage('waiters', waiters); }, [waiters]);
             useEffect(() => { saveToStorage('sales', sales); }, [sales]);
+			            // Auto-calculate card amount in Mixed payment
+            useEffect(() => {
+                if (selectedPaymentMethod === 'Mixed' && selectedTable && showPaymentModal) {
+                    const totalDue = getTotal(selectedTable.orders) + parseFloat(tipAmount || '0');
+                    const cashReceived = parseFloat(cashAmount || '0');
+                    const remainingForCard = Math.max(0, totalDue - cashReceived);
+                    setCardAmount(remainingForCard.toFixed(2));
+                }
+            }, [cashAmount, tipAmount, selectedTable, selectedPaymentMethod, showPaymentModal]);
             useEffect(() => { 
                 saveToStorage('historicalSales', historicalSales);
                 if (firebaseEnabled && historicalSales.length > 0) {
@@ -553,56 +575,77 @@
             };
 
                         const finalizePayment = async () => {
-                if (!selectedPaymentMethod) {
-                    alert('Please select payment method!');
-                    return;
-                }
-                const billTotal = getTotal(selectedTable.orders);
-                const tip = parseFloat(tipAmount) || 0;
-                const total = billTotal + tip;
-                const received = parseFloat(amountReceived) || 0;
+    const billTotal = getTotal(selectedTable.orders);
+    const tip = parseFloat(tipAmount) || 0;
+    const total = billTotal + tip;
 
-                if (selectedPaymentMethod === 'Cash' && received < total) {
-                    alert(`Insufficient! Need R${total.toFixed(2)}`);
-                    return;
-                }
-                const change = selectedPaymentMethod === 'Cash' ? received - total : 0;
+    let cashPaid = 0;
+    let cardPaid = 0;
+    let paymentMethodUsed = '';
 
-                const sale = {
-                    id: Date.now(),
-                    tableName: selectedTable.name,
-                    waiter: selectedTable.waiter,
-                    items: [...selectedTable.orders],
-                    subtotal: billTotal,
-                    tip: tip,
-                    total: total,
-                    paymentMethod: selectedPaymentMethod,
-                    timestamp: new Date().toLocaleString(),
-                    date: new Date().toISOString().split('T')[0],
-                    description: selectedTable.description
-                };
+    if (selectedPaymentMethod === 'Cash') {
+        cashPaid = parseFloat(amountReceived) || 0;
+        if (cashPaid < total) {
+            alert(`Insufficient cash! Need R${total.toFixed(2)}`);
+            return;
+        }
+        paymentMethodUsed = 'Cash';
+    } else if (selectedPaymentMethod === 'Card') {
+        cardPaid = total;
+        paymentMethodUsed = 'Card';
+    } else if (selectedPaymentMethod === 'Mixed') {
+        cashPaid = parseFloat(cashAmount) || 0;
+        cardPaid = parseFloat(cardAmount) || 0;
+        const totalPaid = cashPaid + cardPaid;
+        if (totalPaid < total) {
+            alert(`Insufficient payment! Paid R${totalPaid.toFixed(2)}, need R${total.toFixed(2)}`);
+            return;
+        }
+        paymentMethodUsed = 'Mixed (Cash + Card)';
+    } else {
+        alert('Please select a payment method!');
+        return;
+    }
 
-                // Save sale + update everything
-                setSales([sale, ...sales]);
-                setHistoricalSales([sale, ...historicalSales]);
-                setWaiters(waiters.map(w => 
-                    w.id === selectedTable.waiter.id 
-                        ? { ...w, sales: [...w.sales, sale] } 
-                        : w
-                ));
-                setInventory(inventory.map(item => {
-                    const orderItem = selectedTable.orders.find(o => o.id === item.id);
-                    if (orderItem) return { ...item, stock: item.stock - orderItem.quantity };
-                    return item;
-                }));
-                setTables(tables.map(t => 
-                    t.id === selectedTable.id 
-                        ? { ...t, status: 'available', orders: [], waiter: null, description: '', partiallyPaid: false }
-                        : t
-                ));
+    const change = cashPaid > 0 ? Math.max(0, cashPaid - total) : 0;
 
-                // PRINT RECEIPT WITH TIP
-                const receiptText = `
+    const sale = {
+        id: Date.now(),
+        tableName: selectedTable.name,
+        waiter: selectedTable.waiter,
+        items: [...selectedTable.orders],
+        subtotal: billTotal,
+        tip: tip,
+        total: total,
+        paymentMethod: paymentMethodUsed,
+        cashPortion: cashPaid,
+        cardPortion: cardPaid,
+        timestamp: new Date().toLocaleString(),
+        date: new Date().toISOString().split('T')[0],
+        description: selectedTable.description
+    };
+
+    // Save sale and update state (unchanged)
+    setSales([sale, ...sales]);
+    setHistoricalSales([sale, ...historicalSales]);
+    setWaiters(waiters.map(w => 
+        w.id === selectedTable.waiter.id 
+            ? { ...w, sales: [...w.sales, sale] } 
+            : w
+    ));
+    setInventory(inventory.map(item => {
+        const orderItem = selectedTable.orders.find(o => o.id === item.id);
+        if (orderItem) return { ...item, stock: item.stock - orderItem.quantity };
+        return item;
+    }));
+    setTables(tables.map(t => 
+        t.id === selectedTable.id 
+            ? { ...t, status: 'available', orders: [], waiter: null, description: '', partiallyPaid: false }
+            : t
+    ));
+
+    // Updated receipt text to show mixed payment
+    const receiptText = `
        LITTLE JUNGLE PLAYGROUND      
      www.littlejungle.co.za     
      Tel: 066 287 4686        
@@ -627,31 +670,32 @@ TIP                                 R ${tip > 0 ? String(tip.toFixed(2)).padStar
 
 TOTAL                               R ${String(total.toFixed(2)).padStart(8)}
 
-${selectedPaymentMethod === 'Cash' ? 
-`Received                            R ${received.toFixed(2).padStart(8)}
-Change                              R ${change.toFixed(2).padStart(8)}` : ''}
+${paymentMethodUsed.includes('Cash') ? 
+`Cash Paid                           R ${cashPaid.toFixed(2).padStart(8)}
+${cardPaid > 0 ? `Card Paid                           R ${cardPaid.toFixed(2).padStart(8)}\n` : ''}
+${change > 0 ? `Change                              R ${change.toFixed(2).padStart(8)}` : ''}` : 
+`Paid by Card                        R ${total.toFixed(2).padStart(8)}`}
 
 Thank you! Come again soon!
 `.trim();
 
-                                // Try to print to the thermal printer first
-                const success = await printViaNetwork(receiptText);
+    const success = await printViaNetwork(receiptText);
+    if (!success) {
+        const win = window.open('', '_blank');
+        win.document.write(`<pre style="font-family:monospace">${receiptText}</pre>`);
+        win.document.close();
+        win.print();
+    }
 
-if (!success) {
-    alert('Printer not responding – opening print window');
-    const win = window.open('', '_blank');
-    win.document.write(`<pre style="font-family:monospace">${receiptText}</pre>`);
-    win.document.close();
-    win.print();
-}
-
-alert(change > 0 ? `Payment complete! Change R${change.toFixed(2)}` : 'Payment complete!');
-                setShowPaymentModal(false);
-                setSelectedTable(null);
-                setAmountReceived('');
-                setTipAmount('0');
-                setSelectedPaymentMethod(null);
-            };            const finalizeSplitPayment = async (payerIndex) => {
+    alert(change > 0 ? `Payment complete! Change R${change.toFixed(2)}` : 'Payment complete!');
+    setShowPaymentModal(false);
+    setSelectedTable(null);
+    setAmountReceived('');
+    setTipAmount('0');
+    setSelectedPaymentMethod(null);
+    setCashAmount('');
+    setCardAmount('');
+};            const finalizeSplitPayment = async (payerIndex) => {
                 const payer = payers[payerIndex];
                 if (!payer.paymentMethod) return alert('Select payment method!');
                 if (payer.items.length === 0) return alert('No items!');
@@ -1274,7 +1318,7 @@ Tips   R${wtip.toFixed(2)}
                                         {isFullScreen ? '📴 Exit Full Screen' : '📺 Full Screen'}
                                     </button>
                                     <div className="text-right">
-                                                                                {firebaseEnabled && <p className="text-xs text-blue-600">☁️ Cloud Enabled</p>}
+                                                                                {firebaseEnabled && <p className="text-xs text-blue-600">.</p>}
                                     </div>
                                 </div>
                             </div>
@@ -1568,26 +1612,89 @@ Tips   R${wtip.toFixed(2)}
                                                 </div>
                                             </div>
                                             <p className="font-semibold mb-3">Payment method:</p>
-                                            <div className="grid grid-cols-2 gap-3 mb-4">
-                                                <button onClick={() => setSelectedPaymentMethod('Cash')} className={`p-4 rounded-lg font-bold border-2 ${selectedPaymentMethod === 'Cash' ? 'bg-green-500 text-white' : 'bg-gray-100'}`}>
-                                                    Cash
-                                                </button>
-                                                <button onClick={() => setSelectedPaymentMethod('Card')} className={`p-4 rounded-lg font-bold border-2 ${selectedPaymentMethod === 'Card' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}>
-                                                    Card
-                                                </button>
-                                            </div>
-                                            {selectedPaymentMethod === 'Cash' && (
-                                                <div className="mb-4">
-                                                    <label className="block font-semibold mb-2">Amount Received</label>
-                                                    <input type="number" value={amountReceived} onChange={(e) => setAmountReceived(e.target.value)} className="w-full px-4 py-3 border-2 rounded-lg" placeholder="0.00" />
-                                                    {amountReceived && (
-                                                        <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-                                                            <p className="text-sm">Change:</p>
-                                                            <p className="text-2xl font-bold text-blue-600">R{Math.max(0, parseFloat(amountReceived) - (getTotal(selectedTable.orders) + parseFloat(tipAmount || 0))).toFixed(2)}</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            )}
+<div className="grid grid-cols-3 gap-3 mb-4">
+    <button 
+        onClick={() => {
+            setSelectedPaymentMethod('Cash');
+            setCashAmount('');
+            setCardAmount('');
+        }} 
+        className={`p-4 rounded-lg font-bold border-2 ${selectedPaymentMethod === 'Cash' ? 'bg-green-500 text-white' : 'bg-gray-100'}`}
+    >
+        Cash Only
+    </button>
+    <button 
+        onClick={() => {
+            setSelectedPaymentMethod('Card');
+            setCashAmount('');
+            setCardAmount('');
+        }} 
+        className={`p-4 rounded-lg font-bold border-2 ${selectedPaymentMethod === 'Card' ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}
+    >
+        Card Only
+    </button>
+    <button 
+        onClick={() => {
+            setSelectedPaymentMethod('Mixed');
+            // Auto-fill card for remaining if cash entered, but allow manual
+        }} 
+        className={`p-4 rounded-lg font-bold border-2 ${selectedPaymentMethod === 'Mixed' ? 'bg-purple-500 text-white' : 'bg-gray-100'}`}
+    >
+        Mixed
+    </button>
+</div>
+
+{/* Cash input - always show if Cash or Mixed */}
+{(selectedPaymentMethod === 'Cash' || selectedPaymentMethod === 'Mixed') && (
+    <div className="mb-4">
+        <label className="block font-semibold mb-2">Cash Received</label>
+        <input 
+            type="number" 
+            value={selectedPaymentMethod === 'Cash' ? amountReceived : cashAmount} 
+            onChange={(e) => {
+                if (selectedPaymentMethod === 'Cash') {
+                    setAmountReceived(e.target.value);
+                } else {
+                    setCashAmount(e.target.value);
+                }
+            }} 
+            className="w-full px-4 py-3 border-2 rounded-lg" 
+            placeholder="0.00" 
+        />
+    </div>
+)}
+
+{/* Card input - only for Mixed */}
+{selectedPaymentMethod === 'Mixed' && (
+    <div className="mb-4">
+        <label className="block font-semibold mb-2">Card Amount</label>
+        <input 
+            type="number" 
+            value={cardAmount} 
+            onChange={(e) => setCardAmount(e.target.value)} 
+            className="w-full px-4 py-3 border-2 rounded-lg bg-yellow-50 font-semibold text-blue-700"
+            placeholder="Auto-calculated"
+        />
+        <p className="text-xs text-gray-600 mt-1">
+            💡 Automatically filled with remaining balance after cash. Editable if needed.
+        </p>
+    </div>
+)}
+
+{/* Show breakdown for Mixed */}
+{selectedPaymentMethod === 'Mixed' && (
+    <div className="mt-3 p-3 bg-purple-50 rounded-lg">
+        <p className="text-sm font-semibold">Payment Summary:</p>
+        <p>Cash: R{(parseFloat(cashAmount) || 0).toFixed(2)}</p>
+        <p>Card: R{(parseFloat(cardAmount) || 0).toFixed(2)}</p>
+        <p className="font-bold">Total Paid: R{((parseFloat(cashAmount) || 0) + (parseFloat(cardAmount) || 0)).toFixed(2)}</p>
+        {((parseFloat(cashAmount) || 0) + (parseFloat(cardAmount) || 0)) > (getTotal(selectedTable.orders) + parseFloat(tipAmount || 0)) && (
+            <p className="text-green-600 font-bold">
+                Change: R{Math.max(0, (parseFloat(cashAmount) || 0) - (getTotal(selectedTable.orders) + parseFloat(tipAmount || 0))).toFixed(2)}
+            </p>
+        )}
+    </div>
+)}
                                             <div className="space-y-3">
                                                 <button onClick={finalizePayment} className="w-full bg-green-500 hover:bg-green-600 text-white p-4 rounded-lg font-bold">
                                                     Complete Payment
@@ -1753,6 +1860,63 @@ Tips   R${wtip.toFixed(2)}
     <div>
         <h2 className="text-2xl font-bold mb-6">Floor Plan</h2>
         
+		{/* WALK-IN TABLE - Integrated with Main Area */}
+<div className="mb-8">
+    <div className="flex items-center mb-4">
+        <div className="w-4 h-4 bg-teal-500 rounded mr-2"></div>
+        <h3 className="text-xl font-bold text-teal-800">🚶 Walk-In / Counter</h3>
+    </div>
+    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+        {tables.filter(table => table.id === 99).map(table => (
+            <div key={table.id} className={`border-2 rounded-lg p-4 ${table.status === 'available' ? 'border-green-300 bg-green-50' : 'border-red-300 bg-red-50'}`}>
+                <div className="text-center mb-3">
+                    <h3 className="text-lg font-bold text-teal-900">{table.name}</h3>
+                    <p className={`text-xs font-semibold ${table.status === 'available' ? 'text-green-600' : 'text-red-600'}`}>
+                        {table.status === 'available' ? 'Available' : 'Occupied'}
+                    </p>
+                </div>
+                {table.status === 'available' ? (
+                    <button onClick={() => openTable(table)} className="w-full bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-sm font-semibold">
+                        Open
+                    </button>
+                ) : (
+                    <div>
+                        <div className="text-xs mb-2">
+                            <p>Waiter: <span className="font-semibold">{table.waiter?.name || 'N/A'}</span></p>
+                            <p>Items: <span className="font-semibold">{table.orders.length}</span></p>
+                            <p>Total: <span className="font-semibold text-green-600">R{getTotal(table.orders)}</span></p>
+                            {table.partiallyPaid && <p className="text-orange-600 text-xs mt-1">⚡ Partially Paid</p>}
+                        </div>
+                        <div className="space-y-1">
+                            <button 
+                                onClick={() => addItemsToTable(table)}
+                                className={`w-full py-1 rounded text-xs font-semibold transition-all ${
+                                    table.status !== 'occupied'
+                                        ? 'bg-gray-400 text-gray-700 cursor-not-allowed'
+                                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                }`}
+                                title={table.partiallyPaid ? 'Partially paid – adding still allowed' : ''}
+                            >
+                                {table.partiallyPaid ? 'Add More (±)' : 'Add Items'}
+                                {table.partiallyPaid && <span className="ml-1 text-xs">±</span>}
+                            </button>
+                            <button onClick={() => printBill(table)} className="w-full bg-purple-500 hover:bg-purple-600 text-white py-1 rounded text-xs font-semibold">
+                                Print
+                            </button>
+                            <button onClick={() => openPaymentModal(table)} className="w-full bg-green-500 hover:bg-green-600 text-white py-1 rounded text-xs font-semibold">
+                                Payment
+                            </button>
+                            <button onClick={() => clearBill(table)} className="w-full bg-red-500 hover:bg-red-600 text-white py-1 rounded text-xs font-semibold">
+                                Clear Bill
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        ))}
+    </div>
+</div>
+
         {/* SECTION 1: MAIN AREA */}
         <div className="mb-8">
             <div className="flex items-center mb-4">
@@ -2283,12 +2447,6 @@ Tips   R${wtip.toFixed(2)}
 </body>
 
 </html>
-
-
-
-
-
-
 
 
 
