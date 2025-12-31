@@ -43,7 +43,24 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
         
-        // Firebase Configuration - REPLACE WITH YOUR OWN CONFIG
+        const loadFromStorage = (key, defaultValue) => {
+                try {
+                    const saved = localStorage.getItem(key);
+                    return saved ? JSON.parse(saved) : defaultValue;
+                } catch (e) {
+                    return defaultValue;
+                }
+            };
+
+            const saveToStorage = (key, value) => {
+                try {
+                    localStorage.setItem(key, JSON.stringify(value));
+                } catch (e) {
+                    console.error('Error saving:', e);
+                }
+            };
+        
+        // Firebase Configuration
         const firebaseConfig = {
             	apiKey: "AIzaSyCI4Fsf6vUwnYAGvraeBVxurhUvjgaJy9s",
  		authDomain: "little-jungle-pos.firebaseapp.com",
@@ -98,6 +115,8 @@
             const [newItem, setNewItem] = useState({ name: '', category: 'Drinks', price: '', stock: '' });
             const [isFullScreen, setIsFullScreen] = useState(false);
             const fileInputRef = useRef(null);
+            const [reportsSubTab, setReportsSubTab] = useState('sales'); // 'sales', 'items', 'voids'
+            const [voidLog, setVoidLog] = useState(() => loadFromStorage('voidLog', []));
 
             const toggleFullScreen = () => {
                 if (!document.fullscreenElement) {
@@ -113,22 +132,7 @@
                 }
             };
 
-            const loadFromStorage = (key, defaultValue) => {
-                try {
-                    const saved = localStorage.getItem(key);
-                    return saved ? JSON.parse(saved) : defaultValue;
-                } catch (e) {
-                    return defaultValue;
-                }
-            };
-
-            const saveToStorage = (key, value) => {
-                try {
-                    localStorage.setItem(key, JSON.stringify(value));
-                } catch (e) {
-                    console.error('Error saving:', e);
-                }
-            };
+            
 
             const [inventory, setInventory] = useState(() => loadFromStorage('inventory', [
                 { id: 63, name: 'Americano', category: 'Drinks', price: 28, stock: 30 },
@@ -286,6 +290,9 @@
             useEffect(() => { saveToStorage('tables', tables); }, [tables]);
             useEffect(() => { saveToStorage('waiters', waiters); }, [waiters]);
             useEffect(() => { saveToStorage('sales', sales); }, [sales]);
+            useEffect(() => { 
+    saveToStorage('voidLog', voidLog); 
+}, [voidLog]);
 			            // Auto-calculate card amount in Mixed payment
             useEffect(() => {
                 if (selectedPaymentMethod === 'Mixed' && selectedTable && showPaymentModal) {
@@ -398,6 +405,9 @@
             const PRINTER_IP = '192.168.0.163';
             const PRINTER_PORT = 80;
 
+// MANAGER PIN FOR VOIDS (change this to your desired 4-digit PIN)
+            const MANAGER_PIN = '12345';
+
             const printViaNetwork = async (content) => {
     try {
         const address = 'http://192.168.0.163/cgi-bin/epos/service.cgi?devid=local_printer&timeout=60000';
@@ -473,6 +483,96 @@
                 reader.readAsText(file);
             };
 
+            const requireManagerApproval = () => {
+    return new Promise((resolve) => {
+        // Create modal overlay
+        const overlay = document.createElement('div');
+        overlay.style.position = 'fixed';
+        overlay.style.top = '0';
+        overlay.style.left = '0';
+        overlay.style.width = '100%';
+        overlay.style.height = '100%';
+        overlay.style.backgroundColor = 'rgba(0,0,0,0.7)';
+        overlay.style.display = 'flex';
+        overlay.style.alignItems = 'center';
+        overlay.style.justifyContent = 'center';
+        overlay.style.zIndex = '10000';
+
+        // Create modal box
+        const modal = document.createElement('div');
+        modal.style.backgroundColor = 'white';
+        modal.style.padding = '2rem';
+        modal.style.borderRadius = '1rem';
+        modal.style.boxShadow = '0 10px 25px rgba(0,0,0,0.3)';
+        modal.style.width = '90%';
+        modal.style.maxWidth = '400px';
+        modal.style.textAlign = 'center';
+
+        modal.innerHTML = `
+            <h2 style="margin-top:0; color:#1f2937;">🔒 Manager Approval</h2>
+            <p style="color:#4b5563; margin-bottom:1.5rem;">Enter Manager PIN to continue</p>
+            <input 
+                type="password" 
+                id="managerPinInput" 
+                placeholder="•••••" 
+                maxlength="6"
+                style="
+                    width: 100%;
+                    padding: 1rem;
+                    font-size: 1.5rem;
+                    text-align: center;
+                    border: 2px solid #d1d5db;
+                    border-radius: 0.75rem;
+                    margin-bottom: 1.5rem;
+                    letter-spacing: 0.5rem;
+                "
+                autofocus
+            />
+            <div style="display:flex; gap:1rem;">
+                <button id="pinCancel" style="
+                    flex:1; padding:1rem; background:#6b7280; color:white; 
+                    border:none; border-radius:0.75rem; font-size:1.1rem; cursor:pointer;
+                ">Cancel</button>
+                <button id="pinSubmit" style="
+                    flex:1; padding:1rem; background:#dc2626; color:white; 
+                    border:none; border-radius:0.75rem; font-size:1.1rem; cursor:pointer;
+                ">Submit</button>
+            </div>
+        `;
+
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+
+        const input = modal.querySelector('#managerPinInput');
+        const cancelBtn = modal.querySelector('#pinCancel');
+        const submitBtn = modal.querySelector('#pinSubmit');
+
+        const cleanup = () => {
+            document.body.removeChild(overlay);
+        };
+
+        cancelBtn.onclick = () => {
+            cleanup();
+            resolve(false);
+        };
+
+        submitBtn.onclick = () => {
+            const pin = input.value.trim();
+            cleanup();
+            resolve(pin === MANAGER_PIN);
+        };
+
+        input.addEventListener('keyup', (e) => {
+            if (e.key === 'Enter') {
+                submitBtn.click();
+            }
+        });
+
+        // Auto-focus the input
+        setTimeout(() => input.focus(), 100);
+    });
+};
+
             const addToCart = (item) => {
                 const existingItem = cart.find(i => i.id === item.id);
                 if (existingItem) {
@@ -501,15 +601,33 @@
                 setCart(cart.filter(item => item.id !== id));
             };
 
-            const voidItemFromTable = (itemIndex) => {
-                if (window.confirm('Void this item from the table?')) {
-                    const updatedOrders = selectedTable.orders.filter((_, idx) => idx !== itemIndex);
-                    setTables(tables.map(t => 
-                        t.id === selectedTable.id ? { ...t, orders: updatedOrders } : t
-                    ));
-                    setSelectedTable({ ...selectedTable, orders: updatedOrders });
-                }
-            };
+                       const voidItemFromTable = async (itemIndex) => {
+    const approved = await requireManagerApproval();
+    if (!approved) {
+        alert('❌ Void cancelled: Incorrect PIN or cancelled.');
+        return;
+    }
+    if (window.confirm('Void this item from the table? This action cannot be undone.')) {
+        const updatedOrders = selectedTable.orders.filter((_, idx) => idx !== itemIndex);
+        setTables(tables.map(t => 
+            t.id === selectedTable.id ? { ...t, orders: updatedOrders } : t
+        ));
+        setSelectedTable({ ...selectedTable, orders: updatedOrders });
+        alert('✅ Item voided by Manager.');
+                const voidedItem = selectedTable.orders[itemIndex];
+        const voidEntry = {
+            id: Date.now(),
+            type: 'item',
+            tableName: selectedTable.name,
+            waiterName: selectedTable.waiter?.name || 'Unknown',
+            itemName: voidedItem.name,
+            quantity: voidedItem.quantity,
+            value: voidedItem.price * voidedItem.quantity,
+            timestamp: new Date().toLocaleString(),
+        };
+        setVoidLog([voidEntry, ...voidLog]);
+    }
+};
 
             const getTotal = (items = cart) => {
                 return items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
@@ -574,6 +692,32 @@
                 setSelectedPaymentMethod(null);
             };
 
+            const clearBill = async (table) => {
+    const approved = await requireManagerApproval();
+    if (!approved) {
+        alert('❌ Clear bill cancelled: Manager PIN required.');
+        return;
+    }
+    if (window.confirm(`⚠️ Clear ENTIRE bill for ${table.name}?\nThis will remove all items and reset the table.\nThis action cannot be undone.`)) {
+        setTables(tables.map(t => 
+            t.id === table.id 
+                ? { ...t, orders: [], status: 'available', waiter: null, description: '', partiallyPaid: false } 
+                : t
+        ));
+        alert('✅ Bill cleared by Manager. Table reset.');
+                const clearedValue = getTotal(table.orders);
+        const voidEntry = {
+            id: Date.now(),
+            type: 'clear',
+            tableName: table.name,
+            itemsCount: table.orders.length,
+            value: clearedValue,
+            timestamp: new Date().toLocaleString(),
+        };
+        setVoidLog([voidEntry, ...voidLog]);
+    }
+};
+
                         const finalizePayment = async () => {
     const billTotal = getTotal(selectedTable.orders);
     const tip = parseFloat(tipAmount) || 0;
@@ -612,6 +756,7 @@
     const sale = {
         id: Date.now(),
         tableName: selectedTable.name,
+        waiterName: selectedTable.waiter?.name || 'Unknown',
         waiter: selectedTable.waiter,
         items: [...selectedTable.orders],
         subtotal: billTotal,
@@ -1018,6 +1163,76 @@ ${receiptText}
                 }
             };
 
+            const printVoidReport = async () => {
+                if (voidLog.length === 0) {
+                    alert('No voids recorded – nothing to print!');
+                    return;
+                }
+
+                const totalVoided = voidLog.reduce((sum, v) => sum + v.value, 0);
+
+                let receiptText = `
+LITTLE JUNGLE PLAYGROUND
+VOID REPORT
+${dateFilter.start && dateFilter.end ? `${dateFilter.start} → ${dateFilter.end}` : 
+ dateFilter.start ? `FROM ${dateFilter.start}` : 
+ dateFilter.end ? `TO ${dateFilter.end}` : 'ALL TIME'}
+${'='.repeat(42)}
+Printed: ${new Date().toLocaleString()}
+${'='.repeat(42)}
+TOTAL VOIDED      R${totalVoided.toFixed(2).padStart(12)}
+ACTIONS                ${voidLog.length.toString().padStart(12)}
+${'='.repeat(42)}
+DETAILS
+${'-'.repeat(42)}
+                `.trim();
+
+                // Sort newest first
+                const sortedVoids = [...voidLog].sort((a, b) => b.id - a.id);
+
+                sortedVoids.forEach(entry => {
+                                        receiptText += `\n${entry.timestamp}
+${entry.tableName} | Waiter: ${entry.waiterName || 'None'}
+${entry.type === 'item' ? 'Void Item' : 'FULL CLEAR'}
+${entry.type === 'item' 
+    ? `${entry.quantity}x ${entry.itemName}` 
+    : `Cleared ${entry.itemsCount} items`}
+Value: -R${entry.value.toFixed(2)}`;
+                    receiptText += `\n${'-'.repeat(42)}`;
+                });
+
+                receiptText += `\n\nGRAND TOTAL VOIDED: R${totalVoided.toFixed(2).padStart(8)}\n`;
+                receiptText += `${'='.repeat(42)}\n\nThank you!\n\n\n\n\n`;
+
+                const success = await printViaNetwork(receiptText);
+
+                if (!success) {
+                    alert('Printer not available → opening browser print');
+                    const win = window.open('', '_blank');
+                    win.document.write(`
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <title>Void Report</title>
+                            <style>
+                                body { font-family: monospace; padding: 20px; max-width: 400px; margin: 0 auto; font-size: 12px; line-height: 1.5; }
+                                pre { white-space: pre; }
+                            </style>
+                        </head>
+                        <body>
+                            <pre>${receiptText}</pre>
+                            <div style="text-align:center; margin-top:20px;">
+                                <button onclick="window.print(); window.close()" 
+                                        style="padding:12px 24px; font-size:16px; background:#dc2626; color:white; border:none; border-radius:6px; cursor:pointer;">
+                                    Print / Close
+                                </button>
+                            </div>
+                        </body>
+                        </html>
+                    `);
+                    win.document.close();
+                }
+            };
                         const printConsolidatedReport = async () => {
                 const filteredSales = getFilteredSales();
                 const totalSales = filteredSales.reduce((sum, s) => sum + s.total, 0);
@@ -1120,6 +1335,144 @@ Tips   R${wtip.toFixed(2)}
                     reportWindow.document.close();
                     setTimeout(() => reportWindow.print(), 500);
                 }
+            };
+const printItemsSoldReport = async () => {
+                const filteredSales = getFilteredSales();
+                
+                if (filteredSales.length === 0) {
+                    alert('No sales in the selected period!');
+                    return;
+                }
+
+                // Collect all sold items from all sales
+                const allItems = [];
+                filteredSales.forEach(sale => {
+                    sale.items.forEach(item => {
+                        allItems.push({
+                            name: item.name,
+                            quantity: item.quantity,
+                            lineTotal: item.price * item.quantity
+                        });
+                    });
+                });
+
+                // Sort by timestamp (newest first) so items appear in chronological order
+                const sortedSales = [...filteredSales].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                const sortedItems = [];
+                sortedSales.forEach(sale => {
+                    sale.items.forEach(item => {
+                        sortedItems.push({
+                            name: item.name,
+                            quantity: item.quantity,
+                            lineTotal: item.price * item.quantity
+                        });
+                    });
+                });
+
+                let totalItemsCount = 0;
+                let grandTotal = 0;
+
+                let receiptText = `
+LITTLE JUNGLE PLAYGROUND
+ITEMS SOLD REPORT
+${dateFilter.start && dateFilter.end ? `${dateFilter.start} → ${dateFilter.end}` : 
+ dateFilter.start ? `FROM ${dateFilter.start}` : 
+ dateFilter.end ? `TO ${dateFilter.end}` : 'TODAY'}
+${'='.repeat(42)}
+Printed: ${new Date().toLocaleString()}
+${'='.repeat(42)}
+                `.trim();
+
+                sortedItems.forEach(item => {
+                    totalItemsCount += item.quantity;
+                    grandTotal += item.lineTotal;
+                    receiptText += `\n${String(item.quantity).padStart(3)}x ${item.name.padEnd(28)} R${item.lineTotal.toFixed(2).padStart(7)}`;
+                });
+
+                receiptText += `\n\n${'='.repeat(42)}`;
+                receiptText += `\nTOTAL ITEMS SOLD: ${totalItemsCount}`;
+                receiptText += `\nGRAND TOTAL:      R${grandTotal.toFixed(2).padStart(20)}`;
+                receiptText += `\n${'='.repeat(42)}\n\n`;
+                receiptText += `Thank you!\n\n\n\n\n`;
+
+                const success = await printViaNetwork(receiptText);
+
+                if (!success) {
+                    alert('Printer not available → opening browser print');
+                    const win = window.open('', '_blank');
+                    win.document.write(`
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <title>Items Sold Report</title>
+                            <style>
+                                body { font-family: monospace; padding: 20px; max-width: 400px; margin: 0 auto; font-size: 12px; line-height: 1.5; }
+                                pre { white-space: pre; }
+                            </style>
+                        </head>
+                        <body>
+                            <pre>${receiptText}</pre>
+                            <div style="text-align:center; margin-top:20px;">
+                                <button onclick="window.print(); window.close()" 
+                                        style="padding:12px 24px; font-size:16px; background:#007bff; color:white; border:none; border-radius:6px; cursor:pointer;">
+                                    Print & Close
+                                </button>
+                            </div>
+                        </body>
+                        </html>
+                    `);
+                    win.document.close();
+                }
+            };
+                        const exportItemsSoldToCSV = () => {
+                const filteredSales = getFilteredSales();
+                
+                if (filteredSales.length === 0) {
+                    alert('No sales in the selected period!');
+                    return;
+                }
+
+                // Collect all sold items in chronological order
+                const sortedSales = [...filteredSales].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                const rows = [];
+
+                // Header
+                rows.push(['Quantity', 'Item Name', 'Line Total (R)']);
+
+                let totalItems = 0;
+                let grandTotal = 0;
+
+                sortedSales.forEach(sale => {
+                    sale.items.forEach(item => {
+                        const lineTotal = (item.price * item.quantity).toFixed(2);
+                        rows.push([item.quantity, item.name, lineTotal]);
+                        totalItems += item.quantity;
+                        grandTotal += parseFloat(lineTotal);
+                    });
+                });
+
+                // Add footer rows
+                rows.push([]);
+                rows.push(['TOTAL ITEMS SOLD', totalItems, '']);
+                rows.push(['GRAND TOTAL', '', `R${grandTotal.toFixed(2)}`]);
+
+                // Convert to CSV
+                const csvContent = rows.map(row => 
+                    row.map(cell => `"${cell}"`).join(',')
+                ).join('\n');
+
+                // Download
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.setAttribute('href', url);
+                link.setAttribute('download', `items-sold-${dateFilter.start || dateFilter.end || new Date().toISOString().split('T')[0]}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+
+                alert('Items Sold exported to CSV!');
             };
 
             const exportToCSV = (data, filename) => {
@@ -1286,16 +1639,7 @@ Tips   R${wtip.toFixed(2)}
                 setUnassignedItems([]);
             };
 
-            const clearBill = (table) => {
-                if (window.confirm('Clear entire bill for this table? This cannot be undone.')) {
-                    setTables(tables.map(t => 
-                        t.id === table.id ? { ...t, orders: [], status: 'available', waiter: null, description: '' } : t
-                    ));
-                    alert('Bill cleared! Table reset to available.');
-                }
-            };
-
-            return (
+                        return (
                 <div className="min-h-screen bg-gradient-to-br from-green-400 via-yellow-300 to-orange-400 p-4">
                     <div className="max-w-7xl mx-auto">
                         <div className="bg-white rounded-t-2xl shadow-lg p-6 mb-2">
@@ -1305,13 +1649,21 @@ Tips   R${wtip.toFixed(2)}
                                     <p className="text-gray-600">Point of Sale System</p>
                                 </div>
                                 <div className="flex gap-4 items-center">
-                                    <button
-                                        onClick={() => setShowSettings(true)}
-                                        className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-semibold"
-                                    >
-                                        ⚙️ Settings
-                                    </button>
-                                    <button
+                                    <button 
+    onClick={async () => {
+        const approved = await requireManagerApproval();
+        if (approved) {
+            setShowSettings(true);
+        } else {
+            alert('❌ Access denied.');
+        }
+    }} 
+    className={`bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-semibold`}
+    title="Manager PIN required"
+>
+    🔒⚙️ Settings
+</button>
+    <button
                                         onClick={toggleFullScreen}
                                         className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold"
                                     >
@@ -1329,15 +1681,49 @@ Tips   R${wtip.toFixed(2)}
                                 <button onClick={() => setActiveTab('tables')} className={`flex-1 py-4 px-6 font-semibold ${activeTab === 'tables' ? 'bg-green-500 text-white' : 'bg-gray-100'}`}>
                                     Tables
                                 </button>
-                                <button onClick={() => setActiveTab('menu')} className={`flex-1 py-4 px-6 font-semibold ${activeTab === 'menu' ? 'bg-green-500 text-white' : 'bg-gray-100'}`}>
-                                    Menu
-                                </button>
-                                <button onClick={() => setActiveTab('reports')} className={`flex-1 py-4 px-6 font-semibold ${activeTab === 'reports' ? 'bg-green-500 text-white' : 'bg-gray-100'}`}>
-                                    Reports
-                                </button>
-                                <button onClick={() => setActiveTab('cashup')} className={`flex-1 py-4 px-6 font-semibold ${activeTab === 'cashup' ? 'bg-green-500 text-white' : 'bg-gray-100'}`}>
-                                    Cash Up
-                                </button>
+                                <button 
+    onClick={async () => {
+        const approved = await requireManagerApproval();
+        if (approved) {
+            setActiveTab('menu');
+        } else {
+            alert('❌ Access denied.');
+        }
+    }} 
+    className={`flex-1 py-4 px-6 font-semibold ${activeTab === 'menu' ? 'bg-green-500 text-white' : 'bg-gray-100'}`}
+    title="Manager PIN required"
+>
+    🔒 Menu
+</button>
+                                <button 
+    onClick={async () => {
+        const approved = await requireManagerApproval();
+        if (approved) {
+            setActiveTab('reports');
+        } else {
+            alert('❌ Access denied.');
+        }
+    }} 
+    className={`flex-1 py-4 px-6 font-semibold ${activeTab === 'reports' ? 'bg-green-500 text-white' : 'bg-gray-100'}`}
+    title="Manager PIN required"
+>
+    🔒 Reports
+</button>
+
+<button 
+    onClick={async () => {
+        const approved = await requireManagerApproval();
+        if (approved) {
+            setActiveTab('endofday');
+        } else {
+            alert('❌ Access denied.');
+        }
+    }} 
+    className={`flex-1 py-4 px-6 font-semibold ${activeTab === 'endofday' ? 'bg-green-500 text-white border-b-4 border-green-700' : 'bg-gray-200'}`}
+    title="Manager PIN required"
+>
+    🔒 📅 End of Day
+</button>
                             </div>
                         </div>
 
@@ -1416,13 +1802,7 @@ Tips   R${wtip.toFixed(2)}
                                                 <input ref={fileInputRef} type="file" accept=".json" onChange={importData} style={{ display: 'none' }} />
                                             </div>
                                         </div>
-                                        <div className="border-2 border-gray-200 rounded-lg p-4">
-                                            <h3 className="text-lg font-bold mb-3">🗑️ Clear Sales Data</h3>
-                                            <button onClick={clearSales} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold">
-                                                Clear All Sales
-                                            </button>
-                                        </div>
-                                    </div>
+                                                                            </div>
                                     <button onClick={() => setShowSettings(false)} className="mt-6 w-full bg-gray-300 py-2 rounded-lg">
                                         Close
                                     </button>
@@ -1907,7 +2287,7 @@ Tips   R${wtip.toFixed(2)}
                                 Payment
                             </button>
                             <button onClick={() => clearBill(table)} className="w-full bg-red-500 hover:bg-red-600 text-white py-1 rounded text-xs font-semibold">
-                                Clear Bill
+                                🔒 Clear Bill (Mgr)
                             </button>
                         </div>
                     </div>
@@ -2133,100 +2513,144 @@ Tips   R${wtip.toFixed(2)}
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                         {filteredInventory.map(item => (
                                             <div key={item.id} className="border-2 rounded-lg p-4 bg-white relative">
-                                                <button 
-                                                    onClick={() => {
-                                                        setNewItem(item);
-                                                        setShowAddItem(true);
-                                                    }}
-                                                    className="absolute top-2 right-2 text-blue-500 hover:text-blue-700 text-xl"
-                                                    title="Edit Item"
-                                                >
-                                                    ✏️
-                                                </button>
-                                                <div className="flex justify-between items-start mb-3">
-                                                    <div>
-                                                        <h3 className="text-lg font-bold">{item.name}</h3>
-                                                        <p className="text-sm text-gray-600">{item.category}</p>
-                                                    </div>
-                                                    <button onClick={() => deleteMenuItem(item.id)} className="text-red-500 hover:text-red-700 font-bold text-xl">
-                                                        🗑️
-                                                    </button>
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="text-gray-600">Price:</span>
-                                                        <span className="text-xl font-bold text-green-600">R{item.price}</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="text-gray-600">Stock:</span>
-                                                        <input 
-                                                            type="number" 
-                                                            value={item.stock} 
-                                                            onChange={(e) => updateStock(item.id, e.target.value)} 
-                                                            className="w-20 px-2 py-1 border-2 rounded text-center" 
-                                                        />
-                                                    </div>
-                                                    <div className={`text-sm font-semibold text-center py-1 rounded ${item.stock === 0 ? 'bg-red-100 text-red-600' : item.stock < 10 ? 'bg-yellow-100 text-yellow-600' : 'bg-green-100 text-green-600'}`}>
-                                                        {item.stock === 0 ? 'Out of Stock' : item.stock < 10 ? 'Low Stock' : 'In Stock'}
-                                                    </div>
-                                                </div>
-                                            </div>
+    <button 
+        onClick={() => {
+            setNewItem(item);
+            setShowAddItem(true);
+        }}
+        className="absolute top-2 right-2 text-blue-500 hover:text-blue-700 text-xl"
+        title="Edit Item"
+    >
+        ✏️
+    </button>
+    <div className="flex justify-between items-start mb-3">
+        <div>
+            <h3 className="text-lg font-bold">{item.name}</h3>
+            <p className="text-sm text-gray-600">{item.category}</p>
+        </div>
+        <button onClick={() => deleteMenuItem(item.id)} className="text-red-500 hover:text-red-700 font-bold text-xl">
+            🗑️
+        </button>
+    </div>
+    <div className="space-y-2">
+        <div className="flex justify-between items-center">
+            <span className="text-gray-600">Price:</span>
+            <span className="text-xl font-bold text-green-600">R{item.price}</span>
+        </div>
+        <div className="flex justify-between items-center">
+            <span className="text-gray-600">Stock:</span>
+            <input 
+                type="number" 
+                value={item.stock} 
+                onChange={(e) => updateStock(item.id, e.target.value)} 
+                className="w-20 px-2 py-1 border-2 rounded text-center" 
+            />
+        </div>
+        <div className={`text-sm font-semibold text-center py-1 rounded ${item.stock === 0 ? 'bg-red-100 text-red-600' : item.stock < 10 ? 'bg-yellow-100 text-yellow-600' : 'bg-green-100 text-green-600'}`}>
+            {item.stock === 0 ? 'Out of Stock' : item.stock < 10 ? 'Low Stock' : 'In Stock'}
+        </div>
+    </div>
+</div>
                                         ))}
                                     </div>
                                 </div>
                             )}
 
                             {activeTab === 'reports' && (
-                                <div>
-                                    <h2 className="text-2xl font-bold mb-6">Sales Reports</h2>
-                                    
-                                    {/* Date Filter */}
-                                    <div className="bg-blue-50 p-4 rounded-lg mb-6">
-                                        <h3 className="font-bold mb-3">📅 Date Filter</h3>
-                                        <div className="grid grid-cols-2 gap-4 mb-3">
-                                            <div>
-                                                <label className="block text-sm font-semibold mb-1">Start Date</label>
-                                                <input type="date" value={dateFilter.start} onChange={(e) => setDateFilter({...dateFilter, start: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-semibold mb-1">End Date</label>
-                                                <input type="date" value={dateFilter.end} onChange={(e) => setDateFilter({...dateFilter, end: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
-                                            </div>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <button onClick={() => setDateFilter({ start: '', end: '' })} className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
-                                                Clear
-                                            </button>
-                                            <button onClick={printConsolidatedReport} className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
-                                                🖨️ Print Report
-                                            </button>
-                                            <button onClick={() => exportToCSV(getFilteredSales(), `sales-${new Date().toISOString().split('T')[0]}.csv`)} className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
-                                                📥 Export CSV
-                                            </button>
-                                        </div>
-                                    </div>
-                                    
-                                    {/* Summary Cards */}
-                                    <div className="grid grid-cols-4 gap-4 mb-6">
-                                        <div className="bg-green-50 p-4 rounded-lg">
-                                            <p className="text-gray-600 mb-1 text-sm">Total Sales</p>
-                                            <p className="text-2xl font-bold text-green-600">R{getFilteredSales().reduce((sum, s) => sum + s.total, 0).toFixed(2)}</p>
-                                        </div>
-                                        <div className="bg-blue-50 p-4 rounded-lg">
-                                            <p className="text-gray-600 mb-1 text-sm">Transactions</p>
-                                            <p className="text-2xl font-bold text-blue-600">{getFilteredSales().length}</p>
-                                        </div>
-                                        <div className="bg-purple-50 p-4 rounded-lg">
-                                            <p className="text-gray-600 mb-1 text-sm">Total Tips</p>
-                                            <p className="text-2xl font-bold text-purple-600">R{getFilteredSales().reduce((s, sale) => s + (sale.tip || 0), 0).toFixed(2)}</p>
-                                        </div>
-                                        <div className="bg-orange-50 p-4 rounded-lg">
-                                            <p className="text-gray-600 mb-1 text-sm">Items Sold</p>
-                                            <p className="text-2xl font-bold text-orange-600">{getFilteredSales().reduce((sum, s) => sum + s.items.reduce((iSum, i) => iSum + (i.quantity || 0), 0), 0)}</p>
-                                        </div>
-                                    </div>
+    <div>
+        <h2 className="text-2xl font-bold mb-6">🔒 Manager Reports</h2>
 
-                                    {/* NEW: Sales by Waiter Section */}
+        {/* Sub-Tabs */}
+        <div className="grid grid-cols-3 gap-2 mb-6">
+            <button 
+                onClick={() => setReportsSubTab('sales')}
+                className={`py-3 px-4 rounded-lg font-bold ${reportsSubTab === 'sales' ? 'bg-green-600 text-white' : 'bg-gray-200'}`}
+            >
+                📊 Sales Report
+            </button>
+            <button 
+                onClick={() => setReportsSubTab('items')}
+                className={`py-3 px-4 rounded-lg font-bold ${reportsSubTab === 'items' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
+            >
+                🛒 Items Sold
+            </button>
+            <button 
+                onClick={() => setReportsSubTab('voids')}
+                className={`py-3 px-4 rounded-lg font-bold ${reportsSubTab === 'voids' ? 'bg-red-600 text-white' : 'bg-gray-200'}`}
+            >
+                ❌ Void Report
+            </button>
+        </div>
+
+        {/* Date Filter - Shared across all reports */}
+        <div className="bg-blue-50 p-4 rounded-lg mb-6">
+            <h3 className="font-bold mb-3">📅 Date Filter</h3>
+            <div className="grid grid-cols-2 gap-4 mb-3">
+                <div>
+                    <label className="block text-sm font-semibold mb-1">Start Date</label>
+                    <input type="date" value={dateFilter.start} onChange={(e) => setDateFilter({...dateFilter, start: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                </div>
+                <div>
+                    <label className="block text-sm font-semibold mb-1">End Date</label>
+                    <input type="date" value={dateFilter.end} onChange={(e) => setDateFilter({...dateFilter, end: e.target.value})} className="w-full px-3 py-2 border rounded-lg" />
+                </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+                <button onClick={() => setDateFilter({ start: '', end: '' })} className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                    Clear Filter
+                </button>
+                {reportsSubTab === 'sales' && (
+                    <>
+                        <button onClick={printConsolidatedReport} className="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                            🖨️ Print Sales Report
+                        </button>
+                        <button onClick={() => exportToCSV(getFilteredSales(), `sales-${new Date().toISOString().split('T')[0]}.csv`)} className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                            📥 Export Sales CSV
+                        </button>
+                    </>
+                )}
+                {reportsSubTab === 'items' && (
+                    <>
+                        <button onClick={printItemsSoldReport} className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                            🖨️ Print Items Report
+                        </button>
+                        <button onClick={exportItemsSoldToCSV} className="bg-teal-500 hover:bg-teal-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                            📄 Export Items CSV
+                        </button>
+                    </>
+                )}
+                {reportsSubTab === 'voids' && (
+                    <button onClick={printVoidReport} className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+                        🖨️ Print Void Report
+                    </button>
+                )}
+            </div>
+        </div>
+
+        {/* SALES REPORT SUB-TAB */}
+        {reportsSubTab === 'sales' && (
+            <div>
+                {/* Summary Cards */}
+                <div className="grid grid-cols-4 gap-4 mb-6">
+                    <div className="bg-green-50 p-4 rounded-lg">
+                        <p className="text-gray-600 mb-1 text-sm">Total Sales</p>
+                        <p className="text-2xl font-bold text-green-600">R{getFilteredSales().reduce((sum, s) => sum + s.total, 0).toFixed(2)}</p>
+                    </div>
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                        <p className="text-gray-600 mb-1 text-sm">Transactions</p>
+                        <p className="text-2xl font-bold text-blue-600">{getFilteredSales().length}</p>
+                    </div>
+                    <div className="bg-purple-50 p-4 rounded-lg">
+                        <p className="text-gray-600 mb-1 text-sm">Total Tips</p>
+                        <p className="text-2xl font-bold text-purple-600">R{getFilteredSales().reduce((s, sale) => s + (sale.tip || 0), 0).toFixed(2)}</p>
+                    </div>
+                    <div className="bg-orange-50 p-4 rounded-lg">
+                        <p className="text-gray-600 mb-1 text-sm">Items Sold</p>
+                        <p className="text-2xl font-bold text-orange-600">{getFilteredSales().reduce((sum, s) => sum + s.items.reduce((iSum, i) => iSum + (i.quantity || 0), 0), 0)}</p>
+                    </div>
+                </div>
+
+                 {/* NEW: Sales by Waiter Section */}
                                     <div className="bg-gradient-to-r from-pink-50 to-blue-50 p-6 rounded-lg border-2 border-pink-200 mb-6">
                                         <h3 className="text-2xl font-bold mb-4 text-pink-800">👥 Sales by Waiter</h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -2398,9 +2822,99 @@ Tips   R${wtip.toFixed(2)}
                                 </div>
                             )}
 
-                            {activeTab === 'cashup' && (
+        {/* ITEMS SOLD SUB-TAB */}
+        {reportsSubTab === 'items' && (
+            <div>
+                <h3 className="text-xl font-bold mb-4">📦 Items Sold Report</h3>
+                {getFilteredSales().length === 0 ? (
+                    <p className="text-center py-8 text-gray-500">No sales in selected period</p>
+                ) : (
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                        {(() => {
+                            const itemSummary = {};
+                            getFilteredSales().forEach(sale => {
+                                sale.items.forEach(item => {
+                                    const key = item.name;
+                                    if (!itemSummary[key]) {
+                                        itemSummary[key] = { name: item.name, category: item.category, quantity: 0, revenue: 0 };
+                                    }
+                                    itemSummary[key].quantity += item.quantity;
+                                    itemSummary[key].revenue += item.price * item.quantity;
+                                });
+                            });
+                            return Object.values(itemSummary)
+                                .sort((a, b) => b.quantity - a.quantity)
+                                .map(item => (
+                                    <div key={item.name} className="bg-white rounded-lg p-4 shadow-sm border">
+                                        <div className="flex justify-between">
+                                            <div>
+                                                <p className="font-bold">{item.name}</p>
+                                                <p className="text-sm text-gray-500">{item.category}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-bold text-lg">x{item.quantity}</p>
+                                                <p className="text-green-600 font-semibold">R{item.revenue.toFixed(2)}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ));
+                        })()}
+                    </div>
+                )}
+            </div>
+        )}
+
+        {/* VOID REPORT SUB-TAB */}
+        {reportsSubTab === 'voids' && (
+            <div>
+                <h3 className="text-xl font-bold mb-4 text-red-700">❌ Void Report</h3>
+                
+                <div className="bg-red-50 p-4 rounded-lg mb-6 border-2 border-red-300">
+                    <p className="font-bold text-red-800">Total Voided Amount: 
+                        <span className="text-3xl ml-3">R{voidLog.reduce((sum, v) => sum + v.value, 0).toFixed(2)}</span>
+                    </p>
+                    <p className="text-sm text-red-700 mt-2">Total Actions: {voidLog.length}</p>
+                </div>
+
+                                                {voidLog.length === 0 ? (
+                                    <div className="text-center py-12 text-gray-500">
+                                        <p className="text-xl">No voids recorded yet.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4 max-h-screen overflow-y-auto pb-20">
+                                        {voidLog.map((entry) => (
+                                            <div key={entry.id} className="bg-white border-2 border-red-200 rounded-lg p-4 shadow-sm">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div>
+                                                        <p className="font-bold text-lg text-red-700">
+                                                            {entry.type === 'clear' ? '🗑️ Full Table Clear' : '❌ Item Void'}
+                                                        </p>
+                                                        <p className="text-sm text-gray-600">
+                                                            Table: <span className="font-semibold">{entry.tableName}</span> | {entry.timestamp}
+                                                        </p>
+                                                    </div>
+                                                    <p className="text-2xl font-bold text-red-600">-R{entry.value.toFixed(2)}</p>
+                                                </div>
+                                                <div className="mt-2 text-sm text-gray-700">
+                                                    <p className="font-semibold">Waiter: {entry.waiterName || 'Unknown'}</p>
+                                                    {entry.type === 'item' ? (
+                                                        <p>{entry.quantity}x {entry.itemName}</p>
+                                                    ) : (
+                                                        <p>Cleared {entry.itemsCount} item(s)</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+    </div>
+)}
+
+                            {activeTab === 'endofday' && (
                                 <div>
-                                    <h2 className="text-2xl font-bold mb-6">Daily Cash Up</h2>
+                                    <h2 className="text-2xl font-bold mb-6">End of Day</h2>
                                     <div className="bg-gradient-to-r from-green-500 to-blue-500 text-white p-6 rounded-lg mb-6">
                                         <h3 className="text-xl font-bold mb-2">Today's Summary</h3>
                                         <p className="text-3xl font-bold">Total: R{getTodaySales().toFixed(2)}</p>
@@ -2422,10 +2936,10 @@ Tips   R${wtip.toFixed(2)}
                                     </div>
                                     <div className="bg-yellow-50 border-2 border-yellow-400 p-4 rounded-lg mb-6">
                                         <h3 className="font-bold text-yellow-800 mb-2">⚠️ Warning</h3>
-                                        <p className="text-yellow-800">Finalizing the day will print report and reset daily sales. Historical data preserved.</p>
+                                        <p className="text-yellow-800">Finalizing End of day will print report and reset daily sales. Historical data preserved.</p>
                                     </div>
                                     <button onClick={finalizeDayCashUp} className="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-4 rounded-lg text-lg">
-                                        Finalize Day & Reset
+                                        Finalize End of Day & Reset
                                     </button>
                                 </div>
                             )}
@@ -2447,7 +2961,6 @@ Tips   R${wtip.toFixed(2)}
 </body>
 
 </html>
-
 
 
 
