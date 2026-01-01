@@ -773,6 +773,15 @@
     // Save sale and update state (unchanged)
     setSales([sale, ...sales]);
     setHistoricalSales([sale, ...historicalSales]);
+
+							if (firebaseEnabled) {
+    try {
+        await db.collection('sales').doc(sale.id.toString()).set(sale);
+        console.log("Live sale synced to Firebase");
+    } catch (error) {
+        console.error("Live sync error:", error);
+    }
+}
     setWaiters(waiters.map(w => 
         w.id === selectedTable.waiter.id 
             ? { ...w, sales: [...w.sales, sale] } 
@@ -872,6 +881,15 @@ Thank you! Come again soon!
                 // Save everything (same as before)
                 setSales(prev => [sale, ...prev]);
                 setHistoricalSales(prev => [sale, ...prev]);
+
+							if (firebaseEnabled) {
+    try {
+        await db.collection('sales').doc(sale.id.toString()).set(sale);
+        console.log("Live sale synced to Firebase");
+    } catch (error) {
+        console.error("Live sync error:", error);
+    }
+}
                 setWaiters(waiters.map(w => w.id === selectedTable.waiter.id ? { ...w, sales: [...w.sales, sale] } : w));
                 setInventory(inventory.map(item => {
                     const ordered = payer.items.find(i => i.id === item.id);
@@ -2961,6 +2979,7 @@ ${'='.repeat(42)}
 </body>
 
 </html>
+
 
 
 
