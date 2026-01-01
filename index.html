@@ -304,25 +304,9 @@
             }, [cashAmount, tipAmount, selectedTable, selectedPaymentMethod, showPaymentModal]);
             useEffect(() => { 
                 saveToStorage('historicalSales', historicalSales);
-                if (firebaseEnabled && historicalSales.length > 0) {
-                    syncToFirebase();
-                }
-            }, [historicalSales]);
+                            }, [historicalSales]);
 
-            const syncToFirebase = async () => {
-                if (!firebaseEnabled) return;
-                try {
-                    const batch = db.batch();
-                    historicalSales.forEach(sale => {
-                        const docRef = db.collection('sales').doc(sale.id.toString());
-                        batch.set(docRef, sale, { merge: true });
-                    });
-                    await batch.commit();
-                    console.log("Data synced to Firebase");
-                } catch (error) {
-                    console.error("Firebase sync error:", error);
-                }
-            };
+            
 
             useEffect(() => {
                 if (firebaseEnabled) {
@@ -2979,6 +2963,7 @@ ${'='.repeat(42)}
 </body>
 
 </html>
+
 
 
 
